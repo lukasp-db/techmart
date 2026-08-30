@@ -8,6 +8,9 @@ import yaml
 
 DEFAULT_PROFILE: str = "showcase"
 
+ASSOCIATES_PER_STORE = 40
+CAMPAIGNS_PER_YEAR = 60
+
 
 @dataclass(frozen=True)
 class ScaleProfile:
@@ -16,6 +19,18 @@ class ScaleProfile:
     num_skus: int
     history_years: int
     sales_lines_target: int
+    num_customers: int
+    num_vendors: int
+
+    @property
+    def num_employees(self) -> int:
+        """Derived associate headcount across all stores."""
+        return ASSOCIATES_PER_STORE * self.num_stores
+
+    @property
+    def num_promotions(self) -> int:
+        """Derived promotion/campaign count across the history window."""
+        return CAMPAIGNS_PER_YEAR * self.history_years
 
 
 @dataclass(frozen=True)

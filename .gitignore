@@ -1,0 +1,26 @@
+# Secrets & workspace config — never commit (public repo)
+.env
+.env.*
+*.pem
+*.key
+.databrickscfg
+databricks.yml.local
+secrets/
+**/credentials*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Data artifacts
+data/
+*.parquet
+*.delta
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

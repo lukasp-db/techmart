@@ -33,3 +33,15 @@ def test_start_date_derived_from_history_years():
 def test_unknown_profile_raises():
     with pytest.raises(KeyError):
         load_config(PROFILES, "does_not_exist")
+
+
+def test_profiles_carry_customer_and_vendor_counts():
+    cfg = load_config(PROFILES, "showcase")
+    assert cfg.scale_profile.num_customers == 5_000_000
+    assert cfg.scale_profile.num_vendors == 5_000
+
+
+def test_derived_employee_and_promotion_counts():
+    cfg = load_config(PROFILES, "showcase")  # 1000 stores, 3 years history
+    assert cfg.scale_profile.num_employees == 40 * 1000
+    assert cfg.scale_profile.num_promotions == 60 * 3

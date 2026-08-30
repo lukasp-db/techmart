@@ -136,7 +136,6 @@ def build_dim_date(start: date, end: date) -> pl.DataFrame:
         )
         d += timedelta(days=1)
 
-    # Build schema from DIM_DATE_SPEC to handle nullable columns properly
-    schema = {col.name: getattr(pl, col.dtype) for col in DIM_DATE_SPEC.columns}
-
-    return pl.DataFrame(rows, schema=schema).select(DIM_DATE_SPEC.column_names)
+    return pl.DataFrame(rows, schema=DIM_DATE_SPEC.polars_schema()).select(
+        DIM_DATE_SPEC.column_names
+    )

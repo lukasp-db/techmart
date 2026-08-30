@@ -5,18 +5,19 @@ import sys
 from pathlib import Path
 
 from .config import TechmartConfig, load_config
-from .dimensions.dim_date import DIM_DATE_SPEC, build_dim_date
 from .framework.writer import write_table
+from .registry import REGISTRY
 
 
 def generate(config: TechmartConfig, tables: list[str]) -> list[Path]:
     written: list[Path] = []
     for table in tables:
-        if table == "dim_date":
-            df = build_dim_date(config.start_date, config.end_date)
-            written.append(write_table(df, DIM_DATE_SPEC, config.output_dir))
-        else:
+        try:
+            builder = REGISTRY[table]
+        except KeyError:
             raise ValueError(f"Unknown table: {table!r}")
+        df = builder.build(config)
+        written.append(write_table(df, builder.spec, config.output_dir))
     return written
 
 

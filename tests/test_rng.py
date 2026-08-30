@@ -23,3 +23,9 @@ def test_different_base_seeds_diverge():
 
 def test_stream_returns_numpy_generator():
     assert isinstance(SeededRng(7).stream("x"), np.random.Generator)
+
+
+def test_pinned_values_anchor_the_seeding_scheme():
+    # Regression anchor: fails if the hashing/seeding scheme changes.
+    values = SeededRng(42).stream("dim_date").integers(0, 1_000_000, size=3).tolist()
+    assert values == [825404, 99673, 796550]

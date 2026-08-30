@@ -6,6 +6,7 @@ from typing import Callable
 import polars as pl
 
 from .config import TechmartConfig
+from .dimensions.dim_channel import DIM_CHANNEL_SPEC, build_dim_channel
 from .dimensions.dim_date import DIM_DATE_SPEC, build_dim_date
 from .framework.schema import TableSpec
 
@@ -21,5 +22,6 @@ def _build_dim_date(config: TechmartConfig) -> pl.DataFrame:
 
 
 REGISTRY: dict[str, TableBuilder] = {
+    DIM_CHANNEL_SPEC.name: TableBuilder(spec=DIM_CHANNEL_SPEC, build=build_dim_channel),
     DIM_DATE_SPEC.name: TableBuilder(spec=DIM_DATE_SPEC, build=_build_dim_date),
 }

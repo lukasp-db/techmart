@@ -9,7 +9,7 @@ def get_spark(app_name: str = "techmart", *, local_partitions: int = 4) -> Spark
     """Return a SparkSession suitable for both serverless and local use.
 
     On Databricks serverless a session already exists and is reused unchanged.
-    Locally (tests / laptop) a small ``local[*]`` session is built. A stale
+    Locally (tests / laptop) a small ``local[2]`` session is built. A stale
     ``SPARK_HOME`` pointing at a removed distribution would shadow pyspark's
     bundled runtime, so it is dropped before building.
     """

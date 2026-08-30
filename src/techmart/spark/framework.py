@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 from pyspark.sql.types import (
     BooleanType,
     DataType,
@@ -56,6 +57,17 @@ class FactSpec:
                     c.nullable,
                     metadata={"comment": c.comment},
                 )
+                for c in self.columns
+            ]
+        )
+
+    def select_ordered(self, df: DataFrame) -> DataFrame:
+        """Project df to the spec's columns, in order, attaching each column's
+        comment as field metadata. Spark's saveAsTable propagates the
+        ``comment`` metadata key to Delta column comments (fuels Genie)."""
+        return df.select(
+            *[
+                F.col(c.name).alias(c.name, metadata={"comment": c.comment})
                 for c in self.columns
             ]
         )

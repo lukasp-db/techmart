@@ -15,6 +15,10 @@ from ..spark.session import get_spark
 
 _DATE_WEIGHT_COLS = ["date_sk", "is_weekend", "selling_season", "holiday_name", "year"]
 
+# config/ sits at the repo/bundle root, three levels up from this file
+# (jobs -> techmart -> src -> root). Works locally and when synced into a DAB.
+_DEFAULT_PROFILES_PATH = Path(__file__).resolve().parents[3] / "config" / "scale_profiles.yaml"
+
 
 def generate_sales_line_local(
     spark: SparkSession,
@@ -44,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--schema-prefix", default="techmart_")
     parser.add_argument("--profile", default=None, help="Scale profile name.")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--profiles-path", default="config/scale_profiles.yaml")
+    parser.add_argument("--profiles-path", default=str(_DEFAULT_PROFILES_PATH))
     args = parser.parse_args(argv)
 
     config = load_config(
@@ -56,6 +60,20 @@ def main(argv: list[str] | None = None) -> int:
 
     dim_product = spark.read.table(f"{core}.dim_product")
     dim_date = spark.read.table(f"{core}.dim_date")
+
+    # Referential integrity contract: fact FK ranges are sized from the scale
+    # profile (config), while the dims are read from UC. They MUST have been
+    # built under the same profile or FKs will point at non-existent rows.
+    # Guard the dimension we actually read; the others (store/customer/
+    # employee/promotion) share the same contract — see the plan's carry-forward
+    # for the Phase 4 "derive FK cardinality from the dims" hardening.
+    actual_skus = dim_product.count()
+    if actual_skus != config.scale_profile.num_skus:
+        raise ValueError(
+            f"dim_product has {actual_skus} rows but profile "
+            f"{config.scale_profile.name!r} expects {config.scale_profile.num_skus}; "
+            "regenerate the dims under the same --profile as this fact job."
+        )
 
     econ = dim_product.select("product_sk", "list_price", "standard_cost", "msrp")
     weights = date_seasonality_weights(dim_date.select(*_DATE_WEIGHT_COLS))

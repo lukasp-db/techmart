@@ -110,3 +110,11 @@ def test_deterministic(spark):
         F.count(F.when(F.col("promotion_sk").isNull(), 1)).alias("no_promo"),
     ).collect()[0]
     assert agg() == agg()
+
+
+def test_fact_carries_column_comments(spark):
+    econ, dw = _lookups(spark)
+    df = build_fact_sales_line(spark, _CONFIG, product_econ=econ, date_weights=dw, rows=500)
+    # A representative sample of columns must carry non-empty comments.
+    for name in ["date_sk", "product_sk", "net_sales_amount", "is_marketplace"]:
+        assert df.schema[name].metadata.get("comment", "") != ""

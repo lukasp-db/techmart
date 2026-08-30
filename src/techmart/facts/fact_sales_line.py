@@ -121,4 +121,4 @@ def build_fact_sales_line(
         .withColumn("is_return", F.lit(False))
         .withColumn("is_marketplace", F.col("channel_sk") == F.lit(4))
     )
-    return df.select(FACT_SALES_LINE_SPEC.column_names)
+    return FACT_SALES_LINE_SPEC.select_ordered(df)

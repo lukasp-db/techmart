@@ -61,3 +61,11 @@ def test_struct_type_carries_comment_metadata():
     st = SPEC.struct_type()
     assert st["id_sk"].metadata.get("comment") == "Surrogate key"
     assert st["label"].metadata.get("comment") == "A label"
+
+
+def test_select_ordered_attaches_comment_metadata(spark):
+    df = spark.createDataFrame([("a", 1)], "label string, id_sk long")  # wrong order on purpose
+    out = SPEC.select_ordered(df)
+    assert out.columns == ["id_sk", "label"]  # reordered to spec order
+    assert out.schema["id_sk"].metadata.get("comment") == "Surrogate key"
+    assert out.schema["label"].metadata.get("comment") == "A label"

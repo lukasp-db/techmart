@@ -49,3 +49,15 @@ def test_validate_rejects_wrong_type(spark):
     df = spark.createDataFrame([(1, 2)], "id_sk long, label long")
     with pytest.raises(FactSchemaMismatchError):
         validate_fact_schema(df, SPEC)
+
+
+def test_validate_rejects_extra_column(spark):
+    df = spark.createDataFrame([(1, "a", "x")], "id_sk long, label string, bonus string")
+    with pytest.raises(FactSchemaMismatchError):
+        validate_fact_schema(df, SPEC)
+
+
+def test_struct_type_carries_comment_metadata():
+    st = SPEC.struct_type()
+    assert st["id_sk"].metadata.get("comment") == "Surrogate key"
+    assert st["label"].metadata.get("comment") == "A label"

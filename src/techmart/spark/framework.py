@@ -50,7 +50,12 @@ class FactSpec:
     def struct_type(self) -> StructType:
         return StructType(
             [
-                StructField(c.name, _SPARK_TYPES[c.dtype], c.nullable)
+                StructField(
+                    c.name,
+                    _SPARK_TYPES[c.dtype],
+                    c.nullable,
+                    metadata={"comment": c.comment},
+                )
                 for c in self.columns
             ]
         )

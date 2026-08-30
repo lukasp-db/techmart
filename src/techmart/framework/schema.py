@@ -22,3 +22,9 @@ class TableSpec:
     @property
     def column_names(self) -> list[str]:
         return [c.name for c in self.columns]
+
+    def polars_schema(self) -> dict:
+        """Map each column name to its Polars dtype (resolved from the dtype name)."""
+        import polars as pl
+
+        return {c.name: getattr(pl, c.dtype) for c in self.columns}

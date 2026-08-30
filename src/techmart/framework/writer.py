@@ -16,6 +16,14 @@ def validate_schema(df: pl.DataFrame, spec: TableSpec) -> None:
         raise SchemaMismatchError(
             f"{spec.name}: expected columns {spec.column_names}, got {df.columns}"
         )
+    expected = spec.polars_schema()
+    mismatches = [
+        (name, str(df.schema[name]), str(dtype))
+        for name, dtype in expected.items()
+        if df.schema[name] != dtype
+    ]
+    if mismatches:
+        raise SchemaMismatchError(f"{spec.name}: dtype mismatch (name, actual, expected): {mismatches}")
 
 
 def write_table(df: pl.DataFrame, spec: TableSpec, output_dir: Path) -> Path:

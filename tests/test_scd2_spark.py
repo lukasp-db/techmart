@@ -10,7 +10,10 @@ def test_scd2_columns_shape():
     assert [c.name for c in cols] == [
         "effective_start_ts", "effective_end_ts", "is_current", "version"
     ]
-    assert cols[0].nullable is False and cols[1].nullable is True
+    assert cols[0].nullable is False  # effective_start_ts
+    assert cols[1].nullable is True   # effective_end_ts
+    assert cols[2].nullable is False  # is_current
+    assert cols[3].nullable is False  # version
 
 
 def test_with_scd2_current_values(spark):
@@ -18,6 +21,7 @@ def test_with_scd2_current_values(spark):
     out = with_scd2_current(df, date(2023, 2, 1))
     assert set(["effective_start_ts", "effective_end_ts", "is_current", "version"]).issubset(out.columns)
     assert isinstance(out.schema["effective_start_ts"].dataType, TimestampType)
+    assert isinstance(out.schema["effective_end_ts"].dataType, TimestampType)
     assert isinstance(out.schema["is_current"].dataType, BooleanType)
     assert isinstance(out.schema["version"].dataType, IntegerType)
     row = out.orderBy("store_sk").first()

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-DEFAULT_PROFILE = "showcase"
+DEFAULT_PROFILE: str = "showcase"
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ def load_config(
     end_date: date = date(2026, 1, 31),
 ) -> TechmartConfig:
     profiles = load_profiles(profiles_path)
-    name = profile_name or DEFAULT_PROFILE
+    name = profile_name if profile_name is not None else DEFAULT_PROFILE
     return TechmartConfig(
         scale_profile=profiles[name],
         seed=seed,

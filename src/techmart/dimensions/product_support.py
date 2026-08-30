@@ -9,6 +9,31 @@ COLORS = [
     "Red", "Graphite", "Rose Gold", "Green", "Titanium",
 ]
 
+# Precompute taxonomy paths and brand matrix at module level (runs once at import).
+_PATHS = subcategory_paths()
+_NUM_PATHS = len(_PATHS)
+
+# Per-path attribute lookup arrays (length = _NUM_PATHS).
+_DIV_ID = np.array([p[0].id for p in _PATHS], dtype=object)
+_DIV_NAME = np.array([p[0].name for p in _PATHS], dtype=object)
+_DEP_ID = np.array([p[1].id for p in _PATHS], dtype=object)
+_DEP_NAME = np.array([p[1].name for p in _PATHS], dtype=object)
+_CAT_ID = np.array([p[2].id for p in _PATHS], dtype=object)
+_CAT_NAME = np.array([p[2].name for p in _PATHS], dtype=object)
+_SUB_ID = np.array([p[3].id for p in _PATHS], dtype=object)
+_SUB_NAME = np.array([p[3].name for p in _PATHS], dtype=object)
+
+# Brand matrix metadata and padding.
+_NUM_BRANDS = np.array([len(p[2].brands) for p in _PATHS], dtype=np.int64)
+_MAX_BRANDS = int(_NUM_BRANDS.max())
+
+# Padded brand matrix so brands can be gathered by 2D fancy indexing.
+_BRAND_MATRIX = np.empty((_NUM_PATHS, _MAX_BRANDS), dtype=object)
+for _i, _p in enumerate(_PATHS):
+    _brands = _p[2].brands
+    _BRAND_MATRIX[_i, : len(_brands)] = _brands
+    _BRAND_MATRIX[_i, len(_brands) :] = _brands[0]
+
 
 def assign_taxonomy(
     rng_path: np.random.Generator,
@@ -20,41 +45,17 @@ def assign_taxonomy(
     Vectorized over n: the only loops are over the fixed set of taxonomy paths
     (~49) and the per-path brand lists (~6), never over the row count.
     """
-    paths = subcategory_paths()
-    num_paths = len(paths)
-
-    # Per-path attribute lookup arrays (length = num_paths).
-    div_id = np.array([p[0].id for p in paths], dtype=object)
-    div_name = np.array([p[0].name for p in paths], dtype=object)
-    dep_id = np.array([p[1].id for p in paths], dtype=object)
-    dep_name = np.array([p[1].name for p in paths], dtype=object)
-    cat_id = np.array([p[2].id for p in paths], dtype=object)
-    cat_name = np.array([p[2].name for p in paths], dtype=object)
-    sub_id = np.array([p[3].id for p in paths], dtype=object)
-    sub_name = np.array([p[3].name for p in paths], dtype=object)
-
-    # Padded brand matrix so brands can be gathered by 2D fancy indexing.
-    brand_lists = [p[2].brands for p in paths]
-    num_brands = np.array([len(b) for b in brand_lists], dtype=np.int64)
-    max_brands = int(num_brands.max())
-    brand_matrix = np.empty((num_paths, max_brands), dtype=object)
-    for i, brands in enumerate(brand_lists):
-        for j in range(max_brands):
-            brand_matrix[i, j] = brands[j] if j < len(brands) else brands[0]
-
-    path_idx = rng_path.integers(0, num_paths, n)
-    # Per-element upper bound: brand index stays within the path's brand count.
-    brand_idx = rng_brand.integers(0, num_brands[path_idx])
-    brand = brand_matrix[path_idx, brand_idx]
+    path_idx = rng_path.integers(0, _NUM_PATHS, n)
+    brand_idx = rng_brand.integers(0, _NUM_BRANDS[path_idx])
 
     return {
-        "division_id": div_id[path_idx],
-        "division_name": div_name[path_idx],
-        "department_id": dep_id[path_idx],
-        "department_name": dep_name[path_idx],
-        "category_id": cat_id[path_idx],
-        "category_name": cat_name[path_idx],
-        "subcategory_id": sub_id[path_idx],
-        "subcategory_name": sub_name[path_idx],
-        "brand_name": brand,
+        "division_id": _DIV_ID[path_idx],
+        "division_name": _DIV_NAME[path_idx],
+        "department_id": _DEP_ID[path_idx],
+        "department_name": _DEP_NAME[path_idx],
+        "category_id": _CAT_ID[path_idx],
+        "category_name": _CAT_NAME[path_idx],
+        "subcategory_id": _SUB_ID[path_idx],
+        "subcategory_name": _SUB_NAME[path_idx],
+        "brand_name": _BRAND_MATRIX[path_idx, brand_idx],
     }

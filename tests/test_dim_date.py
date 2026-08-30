@@ -50,3 +50,15 @@ def test_fiscal_period_pattern_454():
     # Week 5 falls in period 2 (4-5-4: period 1 = weeks 1-4, period 2 = weeks 5-9).
     _, _, period_wk5, _ = fiscal_attrs(date(2024, 3, 3))  # 4 weeks after Feb 4
     assert period_wk5 == 2
+
+
+def test_fiscal_year_rollback_for_january():
+    # Jan 15 2024 precedes the first Sunday of Feb 2024, so it belongs to FY2023.
+    assert fiscal_attrs(date(2024, 1, 15))[0] == 2023
+
+
+def test_fiftythree_week_fiscal_year_overflow():
+    # FY2015 is a 53-week retail year; its final week must map to period 12, quarter 4.
+    fy, fw, fp, fq = fiscal_attrs(date(2016, 1, 31))
+    assert (fy, fw, fp, fq) == (2015, 53, 12, 4)
+    assert fw == 53

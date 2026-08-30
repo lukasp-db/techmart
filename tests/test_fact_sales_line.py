@@ -60,13 +60,24 @@ def test_referential_integrity(spark):
         F.max("product_sk").alias("p_hi"),
         F.min("store_sk").alias("s_lo"),
         F.max("store_sk").alias("s_hi"),
+        F.min("customer_sk").alias("cu_lo"),
+        F.max("customer_sk").alias("cu_hi"),
+        F.min("employee_sk").alias("em_lo"),
+        F.max("employee_sk").alias("em_hi"),
+        F.min("channel_sk").alias("c_lo"),
         F.max("channel_sk").alias("c_hi"),
         F.count(F.when(F.col("unit_price").isNull(), 1)).alias("null_price"),
     ).collect()[0]
     assert r["p_lo"] >= 1 and r["p_hi"] <= _PROFILE.num_skus
     assert r["s_lo"] >= 1 and r["s_hi"] <= _PROFILE.num_stores
-    assert r["c_hi"] <= 5
+    assert r["cu_lo"] >= 1 and r["cu_hi"] <= _PROFILE.num_customers
+    assert r["em_lo"] >= 1 and r["em_hi"] <= _PROFILE.num_employees
+    assert r["c_lo"] >= 1 and r["c_hi"] <= 5
     assert r["null_price"] == 0  # every product_sk joined to economics
+    promo = df.filter(F.col("promotion_sk").isNotNull()).agg(
+        F.min("promotion_sk").alias("lo"), F.max("promotion_sk").alias("hi")
+    ).collect()[0]
+    assert promo["lo"] >= 1 and promo["hi"] <= _PROFILE.num_promotions
 
 
 def test_measure_invariants(spark):

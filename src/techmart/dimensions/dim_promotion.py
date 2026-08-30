@@ -43,7 +43,7 @@ def build_dim_promotion(config: TechmartConfig) -> pl.DataFrame:
     sk = support.surrogate_keys(n)
     span = (config.end_date - config.start_date).days
     durations = rng.stream("dim_promotion.dur").integers(3, 30, n)  # days
-    start_offsets = rng.stream("dim_promotion.start").integers(0, max(span - 30, 1), n)
+    start_offsets = rng.stream("dim_promotion.start").integers(0, max(span - 30, 1), n)  # offset in days; reserve 30d for max duration
     start = np.datetime64(config.start_date) + start_offsets.astype("timedelta64[D]")
     end = start + durations.astype("timedelta64[D]")
     # Clamp end_date to not exceed config.end_date
@@ -57,7 +57,7 @@ def build_dim_promotion(config: TechmartConfig) -> pl.DataFrame:
         "promo_name": np.char.add("Promo ", promotion_id),
         "promo_type": support.sample(rng.stream("dim_promotion.type"), _PROMO_TYPES, n),
         "discount_method": support.sample(rng.stream("dim_promotion.method"), _DISCOUNT_METHODS, n),
-        "discount_value": rng.stream("dim_promotion.val").integers(5, 50, n).astype(float),
+        "discount_value": np.round(rng.stream("dim_promotion.val").uniform(5.0, 50.0, n), 2),
         "start_date": start,
         "end_date": end,
         "channel_scope": support.sample(rng.stream("dim_promotion.scope"), _CHANNEL_SCOPES, n),

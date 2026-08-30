@@ -52,10 +52,11 @@ def build_dim_store(config: TechmartConfig) -> pl.DataFrame:
     region_idx = rng.stream("dim_store.region").integers(0, len(_REGIONS), n)
     district_idx = rng.stream("dim_store.district").integers(1, 21, n)  # 20 districts
     postal = rng.stream("dim_store.postal").integers(10000, 99999, n)
+    store_id = support.business_keys("STORE", n, 5)
     data = {
         "store_sk": sk,
-        "store_id": support.business_keys("STORE", n, 5),
-        "store_name": np.char.add("Techmart ", support.business_keys("STORE", n, 5)),
+        "store_id": store_id,
+        "store_name": np.char.add("Techmart ", store_id),
         "store_format": support.sample(rng.stream("dim_store.format"), _FORMATS, n),
         "region_id": np.char.add("RGN", (region_idx + 1).astype(str)),
         "region_name": np.asarray(_REGIONS, dtype=object)[region_idx],

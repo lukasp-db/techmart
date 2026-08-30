@@ -9,6 +9,7 @@ from .config import TechmartConfig
 from .dimensions.dim_channel import DIM_CHANNEL_SPEC, build_dim_channel
 from .dimensions.dim_date import DIM_DATE_SPEC, build_dim_date
 from .dimensions.dim_store import DIM_STORE_SPEC, build_dim_store
+from .dimensions.dim_vendor import DIM_VENDOR_SPEC, build_dim_vendor
 from .framework.schema import TableSpec
 
 
@@ -26,4 +27,5 @@ REGISTRY: dict[str, TableBuilder] = {
     DIM_CHANNEL_SPEC.name: TableBuilder(spec=DIM_CHANNEL_SPEC, build=build_dim_channel),
     DIM_DATE_SPEC.name: TableBuilder(spec=DIM_DATE_SPEC, build=_build_dim_date),
     DIM_STORE_SPEC.name: TableBuilder(spec=DIM_STORE_SPEC, build=build_dim_store),
+    DIM_VENDOR_SPEC.name: TableBuilder(spec=DIM_VENDOR_SPEC, build=build_dim_vendor),
 }

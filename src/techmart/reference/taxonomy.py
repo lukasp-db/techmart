@@ -7,6 +7,9 @@ by that department's categories.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TypedDict
+
+__all__ = ["Subcategory", "Category", "Department", "Division", "TAXONOMY", "subcategory_paths"]
 
 
 @dataclass(frozen=True)
@@ -20,7 +23,7 @@ class Category:
     id: str
     name: str
     subcategories: tuple[Subcategory, ...]
-    brands: tuple[str, ...]
+    brands: tuple[str, ...]  # department-scoped: every sibling category in the department shares this brand list
 
 
 @dataclass(frozen=True)
@@ -37,9 +40,14 @@ class Division:
     departments: tuple[Department, ...]
 
 
+class _RawDepartment(TypedDict):
+    brands: list[str]
+    categories: dict[str, list[str]]
+
+
 # Raw authored content. Structure:
 #   division -> department -> {"brands": [...], "categories": {category: [subcategories]}}
-_RAW: dict[str, dict[str, dict]] = {
+_RAW: dict[str, dict[str, _RawDepartment]] = {
     "Computing": {
         "Laptops": {
             "brands": ["Dell", "ASUS", "Lenovo", "HP", "Acer", "Apple"],

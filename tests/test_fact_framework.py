@@ -2,19 +2,19 @@ import pytest
 from pyspark.sql.types import LongType, StringType, StructType
 
 from techmart.spark.framework import (
-    FactColumn,
-    FactSchemaMismatchError,
-    FactSpec,
-    validate_fact_schema,
+    SparkColumn,
+    SparkSchemaMismatchError,
+    SparkTableSpec,
+    validate_spark_schema,
 )
 
-SPEC = FactSpec(
+SPEC = SparkTableSpec(
     schema="core",
     name="fact_demo",
     grain="one row per demo event",
     columns=[
-        FactColumn("id_sk", "long", "Surrogate key", is_key=True, nullable=False),
-        FactColumn("label", "string", "A label"),
+        SparkColumn("id_sk", "long", "Surrogate key", is_key=True, nullable=False),
+        SparkColumn("label", "string", "A label"),
     ],
 )
 
@@ -35,26 +35,26 @@ def test_struct_type_maps_dtypes():
 
 def test_validate_accepts_matching_dataframe(spark):
     df = spark.createDataFrame([(1, "a")], SPEC.struct_type())
-    validate_fact_schema(df, SPEC)  # no raise
+    validate_spark_schema(df, SPEC)  # no raise
 
 
 def test_validate_rejects_missing_column(spark):
     df = spark.createDataFrame([(1,)], StructType([SPEC.struct_type()["id_sk"]]))
-    with pytest.raises(FactSchemaMismatchError):
-        validate_fact_schema(df, SPEC)
+    with pytest.raises(SparkSchemaMismatchError):
+        validate_spark_schema(df, SPEC)
 
 
 def test_validate_rejects_wrong_type(spark):
     # label is string in the spec; supply long instead.
     df = spark.createDataFrame([(1, 2)], "id_sk long, label long")
-    with pytest.raises(FactSchemaMismatchError):
-        validate_fact_schema(df, SPEC)
+    with pytest.raises(SparkSchemaMismatchError):
+        validate_spark_schema(df, SPEC)
 
 
 def test_validate_rejects_extra_column(spark):
     df = spark.createDataFrame([(1, "a", "x")], "id_sk long, label string, bonus string")
-    with pytest.raises(FactSchemaMismatchError):
-        validate_fact_schema(df, SPEC)
+    with pytest.raises(SparkSchemaMismatchError):
+        validate_spark_schema(df, SPEC)
 
 
 def test_struct_type_carries_comment_metadata():

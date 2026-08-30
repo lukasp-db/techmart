@@ -10,7 +10,7 @@ from pyspark.sql import DataFrame, SparkSession
 from ..config import TechmartConfig, load_config
 from ..facts.fact_sales_line import FACT_SALES_LINE_SPEC, build_fact_sales_line
 from ..facts.lookups import date_seasonality_weights, polars_to_spark, product_economics
-from ..spark.framework import validate_fact_schema
+from ..spark.framework import validate_spark_schema
 from ..spark.session import get_spark
 
 _DATE_WEIGHT_COLS = ["date_sk", "is_weekend", "selling_season", "holiday_name", "year"]
@@ -37,7 +37,7 @@ def generate_sales_line_local(
     dd = polars_to_spark(spark, dim_date_pl.select(_DATE_WEIGHT_COLS))
     weights = date_seasonality_weights(dd)
     df = build_fact_sales_line(spark, config, product_econ=econ, date_weights=weights, rows=rows)
-    validate_fact_schema(df, FACT_SALES_LINE_SPEC)
+    validate_spark_schema(df, FACT_SALES_LINE_SPEC)
     return df
 
 
@@ -78,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     econ = dim_product.select("product_sk", "list_price", "standard_cost", "msrp")
     weights = date_seasonality_weights(dim_date.select(*_DATE_WEIGHT_COLS))
     df = build_fact_sales_line(spark, config, product_econ=econ, date_weights=weights)
-    validate_fact_schema(df, FACT_SALES_LINE_SPEC)
+    validate_spark_schema(df, FACT_SALES_LINE_SPEC)
 
     target = f"{core}.{FACT_SALES_LINE_SPEC.name}"
     df.write.mode("overwrite").saveAsTable(target)

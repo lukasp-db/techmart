@@ -4,36 +4,36 @@ import dbldatagen as dg
 from pyspark.sql import DataFrame, SparkSession, functions as F
 
 from ..config import TechmartConfig
-from ..spark.framework import FactColumn, FactSpec
+from ..spark.framework import SparkColumn, SparkTableSpec
 
-FACT_SALES_LINE_SPEC = FactSpec(
+FACT_SALES_LINE_SPEC = SparkTableSpec(
     schema="core",
     name="fact_sales_line",
     grain="one row per sales transaction line",
     columns=[
-        FactColumn("transaction_id", "long", "Degenerate transaction id", nullable=False),
-        FactColumn("line_number", "int", "Line number within the transaction", nullable=False),
-        FactColumn("receipt_id", "string", "Degenerate receipt id"),
-        FactColumn("date_sk", "long", "Date FK (dim_date, yyyymmdd)", is_key=True, nullable=False),
-        FactColumn("product_sk", "long", "Product FK (dim_product)", is_key=True, nullable=False),
-        FactColumn("store_sk", "long", "Store FK (dim_store)", is_key=True, nullable=False),
-        FactColumn("customer_sk", "long", "Customer FK (dim_customer)", is_key=True, nullable=False),
-        FactColumn("employee_sk", "long", "Selling associate FK (dim_employee)", is_key=True, nullable=False),
-        FactColumn("promotion_sk", "long", "Promotion FK (dim_promotion); null if unpromoted", is_key=True),
-        FactColumn("channel_sk", "long", "Channel FK (dim_channel)", is_key=True, nullable=False),
-        FactColumn("quantity", "int", "Units sold on the line", nullable=False),
-        FactColumn("unit_price", "double", "Selling price per unit"),
-        FactColumn("unit_cost", "double", "Standard cost per unit"),
-        FactColumn("gross_sales_amount", "double", "quantity * unit_price"),
-        FactColumn("discount_amount", "double", "Promotional discount applied"),
-        FactColumn("net_sales_amount", "double", "gross_sales_amount - discount_amount"),
-        FactColumn("tax_amount", "double", "Sales tax on net sales"),
-        FactColumn("cogs_amount", "double", "quantity * unit_cost"),
-        FactColumn("gross_margin_amount", "double", "net_sales_amount - cogs_amount"),
-        FactColumn("loyalty_points_earned", "long", "Loyalty points earned (floor of net sales)"),
-        FactColumn("is_return", "boolean", "Always false in the sales fact", nullable=False),
-        FactColumn("is_marketplace", "boolean", "Sold via the marketplace channel", nullable=False),
-        FactColumn("tender_type", "string", "Payment tender type"),
+        SparkColumn("transaction_id", "long", "Degenerate transaction id", nullable=False),
+        SparkColumn("line_number", "int", "Line number within the transaction", nullable=False),
+        SparkColumn("receipt_id", "string", "Degenerate receipt id"),
+        SparkColumn("date_sk", "long", "Date FK (dim_date, yyyymmdd)", is_key=True, nullable=False),
+        SparkColumn("product_sk", "long", "Product FK (dim_product)", is_key=True, nullable=False),
+        SparkColumn("store_sk", "long", "Store FK (dim_store)", is_key=True, nullable=False),
+        SparkColumn("customer_sk", "long", "Customer FK (dim_customer)", is_key=True, nullable=False),
+        SparkColumn("employee_sk", "long", "Selling associate FK (dim_employee)", is_key=True, nullable=False),
+        SparkColumn("promotion_sk", "long", "Promotion FK (dim_promotion); null if unpromoted", is_key=True),
+        SparkColumn("channel_sk", "long", "Channel FK (dim_channel)", is_key=True, nullable=False),
+        SparkColumn("quantity", "int", "Units sold on the line", nullable=False),
+        SparkColumn("unit_price", "double", "Selling price per unit"),
+        SparkColumn("unit_cost", "double", "Standard cost per unit"),
+        SparkColumn("gross_sales_amount", "double", "quantity * unit_price"),
+        SparkColumn("discount_amount", "double", "Promotional discount applied"),
+        SparkColumn("net_sales_amount", "double", "gross_sales_amount - discount_amount"),
+        SparkColumn("tax_amount", "double", "Sales tax on net sales"),
+        SparkColumn("cogs_amount", "double", "quantity * unit_cost"),
+        SparkColumn("gross_margin_amount", "double", "net_sales_amount - cogs_amount"),
+        SparkColumn("loyalty_points_earned", "long", "Loyalty points earned (floor of net sales)"),
+        SparkColumn("is_return", "boolean", "Always false in the sales fact", nullable=False),
+        SparkColumn("is_marketplace", "boolean", "Sold via the marketplace channel", nullable=False),
+        SparkColumn("tender_type", "string", "Payment tender type"),
     ],
 )
 

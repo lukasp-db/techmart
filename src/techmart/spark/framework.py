@@ -1,3 +1,4 @@
+"""Spark table spec (dims and facts): column definitions, struct types, and schema validation."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from pyspark.sql.types import (
     StringType,
     StructField,
     StructType,
+    TimestampType,
 )
 
 _SPARK_TYPES: dict[str, DataType] = {
@@ -21,15 +23,16 @@ _SPARK_TYPES: dict[str, DataType] = {
     "double": DoubleType(),
     "string": StringType(),
     "boolean": BooleanType(),
+    "timestamp": TimestampType(),
 }
 
 
-class FactSchemaMismatchError(ValueError):
-    """Raised when a DataFrame's columns/types do not match its FactSpec."""
+class SparkSchemaMismatchError(ValueError):
+    """Raised when a DataFrame's columns/types do not match its SparkTableSpec."""
 
 
 @dataclass(frozen=True)
-class FactColumn:
+class SparkColumn:
     name: str
     dtype: str  # one of _SPARK_TYPES
     comment: str
@@ -38,11 +41,11 @@ class FactColumn:
 
 
 @dataclass(frozen=True)
-class FactSpec:
+class SparkTableSpec:
     schema: str  # target schema group, e.g. "core"
     name: str  # table name, e.g. "fact_sales_line"
     grain: str  # one-line description of the row grain
-    columns: list[FactColumn]
+    columns: list[SparkColumn]
 
     @property
     def column_names(self) -> list[str]:
@@ -73,14 +76,14 @@ class FactSpec:
         )
 
 
-def validate_fact_schema(df: DataFrame, spec: FactSpec) -> None:
+def validate_spark_schema(df: DataFrame, spec: SparkTableSpec) -> None:
     expected = {c.name: _SPARK_TYPES[c.dtype] for c in spec.columns}
     actual = dict(df.dtypes)  # name -> simpleString type
 
     missing = [n for n in expected if n not in actual]
     extra = [n for n in actual if n not in expected]
     if missing or extra:
-        raise FactSchemaMismatchError(
+        raise SparkSchemaMismatchError(
             f"{spec.name}: column mismatch (missing={missing}, extra={extra})"
         )
 
@@ -90,6 +93,6 @@ def validate_fact_schema(df: DataFrame, spec: FactSpec) -> None:
         if actual[name] != dtype.simpleString()
     ]
     if mismatches:
-        raise FactSchemaMismatchError(
+        raise SparkSchemaMismatchError(
             f"{spec.name}: dtype mismatch (name, actual, expected): {mismatches}"
         )

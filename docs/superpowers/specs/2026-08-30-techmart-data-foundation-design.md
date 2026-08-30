@@ -59,6 +59,13 @@ more industry-model entities; the mapping is documented per table below.
 - **Lakebase (Postgres)** holds operational write-back state, synced back to the lakehouse.
 - **Naming:** gold tables use `dim_`/`fact_` prefixes; surrogate keys (`*_sk`, BIGINT) for joins,
   business keys (`*_id`) preserved; every table and column carries a `COMMENT` (fuels Genie).
+- **Compute:** all generation and deployment code must run on **Databricks serverless** — pure
+  Python/Polars locally and on serverless for dims/text; Spark/`dbldatagen` on serverless for
+  large facts. No dependency on classic clusters or instance-specific runtime features.
+- **Deployment:** packaged as a **Databricks Asset Bundle (DAB)** (`databricks.yml`) that defines
+  the generation jobs, schema/table creation, metric views, and materializations for one-command
+  deploy to a target workspace. Introduced at Phase 3 (first workspace deploy); finalized in the
+  deployment phase.
 
 ## Bus matrix (conformed dimensions × facts)
 
@@ -280,10 +287,16 @@ write-operations loop.
 
 ## Semantic layer (`techmart_semantic`)
 
-Metric views / documented views over gold:
-- Conformed **metrics** with single definitions: net sales, gross margin %, sell-through,
+The logical layer is built on Databricks **metric views** (first-class YAML semantic objects
+defining a source, dimensions, and measures), not just plain Delta views — this is the
+governed, single-definition surface Genie, dashboards, and the Excel add-on consume.
+
+- **Metric views** over the gold star schema, keyed on the conformed dimensions, exposing
+  **metrics** with single authoritative definitions: net sales, gross margin %, sell-through,
   weeks-of-supply, GMROI, forecast accuracy/MAPE, budget attainment.
-- Persona-oriented view groupings (Exec / Merch / Finance / Store).
+- Persona-oriented metric-view groupings (Exec / Merch / Finance / Store).
+- **Materializations:** a few high-traffic metric views are materialized (scheduled/materialized)
+  to demonstrate the capability and the performance payoff (ties to the Blog 2 perf story).
 - Synonyms + sample values + rich comments for Genie; PK/FK constraints declared for BI tools.
 
 ## Scale, parameterization & realism
@@ -295,9 +308,9 @@ Metric views / documented views over gold:
 - **Realism rules:** referential integrity across all FKs; seasonality (holiday / back-to-school
   peaks, weekend lift); category-level trends; SCD2 histories on dims; price/cost drift;
   long-tail SKU distribution; anomalies injected per the catalog.
-- **Generation approach:** Spark-native (`dbldatagen`) for large facts on a cluster; local
+- **Generation approach:** Spark-native (`dbldatagen`) for large facts on **serverless**; local
   (Polars/Mimesis) for dims; LLM for `product_review`/`service_case` text. Idempotent,
-  re-runnable, config-driven.
+  re-runnable, config-driven. All jobs deployable via the DAB.
 
 ## Operational considerations
 

@@ -19,6 +19,8 @@ _Every task's requirements implicitly include this section._
 - **Config-driven scale:** `scale_profile` ∈ {`demo_lean`, `showcase` (default), `stress`} controls stores/SKUs/history/volume.
 - **Secret-free:** no workspace URLs, tokens, or account identifiers in code or committed files (public repo).
 - **Schemas:** target schema names are unprefixed internally (`core`, `finance`, `ai`, `ops`, `semantic`); the `techmart_` prefix is applied only at deploy time (not this phase).
+- **Serverless-compatible:** all code must run on Databricks serverless compute. Phase 1 is pure Python + Polars (no Spark), which runs on serverless as-is; keep dependencies serverless-installable and avoid classic-cluster-only features.
+- **Deployment (later phases):** the project ships with a Databricks Asset Bundle (`databricks.yml`) for one-command deploy; the logical layer uses Databricks **metric views** with select **materializations**. Not built in Phase 1 — recorded here so foundation code stays compatible.
 
 ---
 
@@ -941,4 +943,10 @@ git commit -m "feat: add CLI entrypoint for dim_date generation"
 
 ## Next phases (separate plans, written when we reach them)
 
-2. Dimensions · 3. Core facts (introduces Spark/`dbldatagen` writer) · 4. Finance & reconciliation · 5. AI enablement · 6. Semantic layer · 7. Lakebase operational + sync.
+2. Dimensions ·
+3. Core facts (introduces Spark/`dbldatagen` on serverless + the DAB scaffold for first workspace deploy) ·
+4. Finance & reconciliation ·
+5. AI enablement ·
+6. Semantic layer (Databricks **metric views** + select **materializations**) ·
+7. Lakebase operational + sync ·
+8. Deployment (finalize the DAB for one-command serverless deploy).

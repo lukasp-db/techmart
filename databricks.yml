@@ -1,0 +1,22 @@
+bundle:
+  name: techmart
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog to hold techmart_* schemas.
+    default: stable_classic_ppke9o
+  schema_prefix:
+    description: Schema name prefix (schemas are <prefix>core, <prefix>finance, ...).
+    default: techmart_
+  scale_profile:
+    description: Scale profile (demo_lean | showcase | stress).
+    default: showcase
+
+targets:
+  dev:
+    mode: development
+    default: true
+    # Host is supplied per-deploy (CLI --profile / DATABRICKS_HOST); never committed.

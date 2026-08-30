@@ -8,8 +8,6 @@ import polars as pl
 from pyspark.sql import DataFrame, SparkSession
 
 from ..config import TechmartConfig, load_config
-from ..dimensions.dim_date import build_dim_date
-from ..dimensions.dim_product import build_dim_product
 from ..facts.fact_sales_line import FACT_SALES_LINE_SPEC, build_fact_sales_line
 from ..facts.lookups import date_seasonality_weights, polars_to_spark, product_economics
 from ..spark.framework import validate_fact_schema
@@ -54,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed, catalog=args.catalog, schema_prefix=args.schema_prefix,
     )
     spark = get_spark("techmart-generate-facts")
-    core = f"{args.catalog}.{args.schema_prefix}core"
+    core = f"{config.catalog}.{config.schema_prefix}core"
 
     dim_product = spark.read.table(f"{core}.dim_product")
     dim_date = spark.read.table(f"{core}.dim_date")

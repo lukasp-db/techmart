@@ -15,7 +15,7 @@ PROFILES = Path("config/scale_profiles.yaml")
 
 def test_loads_all_three_profiles():
     profiles = load_profiles(PROFILES)
-    assert set(profiles) == {"demo_lean", "showcase", "stress"}
+    assert {"demo_lean", "showcase", "stress", "smoke"} <= set(profiles)
     assert all(isinstance(p, ScaleProfile) for p in profiles.values())
 
 

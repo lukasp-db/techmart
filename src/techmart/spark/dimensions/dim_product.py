@@ -16,6 +16,7 @@ from ...reference.taxonomy import subcategory_paths
 from ..framework import SparkColumn, SparkTableSpec
 from ..scd2 import scd2_columns, with_scd2_current
 
+# Product color palette for the dbldatagen `values=` color assignment.
 _COLORS = [
     "Black", "Silver", "White", "Space Gray", "Blue",
     "Red", "Graphite", "Rose Gold", "Green", "Titanium",

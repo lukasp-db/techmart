@@ -25,7 +25,8 @@ def _build(spark, rows=3000):
 def test_schema_and_columns(spark):
     df = _build(spark)
     assert df.columns == FACT_SALES_LINE_SPEC.column_names
-    assert df.count() > 0
+    # rows=3000 is a line-count target; basket expansion (avg ~2.9) keeps it in a sane band.
+    assert 1500 < df.count() < 5000
 
 
 def test_referential_integrity(spark):
@@ -66,8 +67,9 @@ def test_basket_coherence(spark):
     incoherent = df.groupBy("transaction_id").agg(
         F.countDistinct("store_sk").alias("s"), F.countDistinct("date_sk").alias("d"),
         F.countDistinct("customer_sk").alias("c"), F.countDistinct("channel_sk").alias("ch"),
+        F.countDistinct("employee_sk").alias("e"),
         F.count("*").alias("n"), F.max("line_number").alias("mx"), F.min("line_number").alias("mn"),
-    ).filter("s > 1 or d > 1 or c > 1 or ch > 1 or n <> mx or mn <> 1").count()
+    ).filter("s > 1 or d > 1 or c > 1 or ch > 1 or e > 1 or n <> mx or mn <> 1").count()
     assert incoherent == 0
 
 

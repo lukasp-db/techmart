@@ -8,6 +8,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import (
     BooleanType,
     DataType,
+    DateType,
     DoubleType,
     IntegerType,
     LongType,
@@ -24,6 +25,7 @@ _SPARK_TYPES: dict[str, DataType] = {
     "string": StringType(),
     "boolean": BooleanType(),
     "timestamp": TimestampType(),
+    "date": DateType(),
 }
 
 

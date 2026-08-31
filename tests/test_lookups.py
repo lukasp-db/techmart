@@ -1,11 +1,12 @@
 from datetime import date
 
+from pyspark.sql import functions as F
+
 from techmart.config import ScaleProfile, TechmartConfig
-from techmart.dimensions.dim_date import build_dim_date
-from techmart.dimensions.dim_product import build_dim_product
+from techmart.spark.dimensions.dim_date import build_dim_date
+from techmart.spark.dimensions.dim_product import build_dim_product
 from techmart.facts.lookups import (
     date_seasonality_weights,
-    polars_to_spark,
     product_economics,
 )
 
@@ -29,11 +30,10 @@ _CONFIG = TechmartConfig(
 
 
 def test_product_economics_one_row_per_sku(spark):
-    dim = build_dim_product(_CONFIG)
-    econ = product_economics(spark, dim)
+    dim = build_dim_product(spark, _CONFIG)
+    econ = product_economics(dim)
     assert econ.count() == _PROFILE.num_skus
     assert set(econ.columns) == {"product_sk", "list_price", "standard_cost", "msrp"}
-    from pyspark.sql import functions as F
 
     row = econ.agg(
         F.min("product_sk").alias("lo"),
@@ -45,14 +45,11 @@ def test_product_economics_one_row_per_sku(spark):
 
 
 def test_date_weights_cover_calendar_and_are_positive(spark):
-    dim = build_dim_date(_CONFIG.start_date, _CONFIG.end_date)
-    dim_spark = polars_to_spark(
-        spark,
-        dim.select(["date_sk", "is_weekend", "selling_season", "holiday_name", "year"]),
-    )
-    date_sks, weights = date_seasonality_weights(dim_spark)
-    assert len(date_sks) == dim.height
-    assert len(weights) == dim.height
+    dim = build_dim_date(spark, _CONFIG)
+    date_sks, weights = date_seasonality_weights(dim)
+    total_days = dim.count()
+    assert len(date_sks) == total_days
+    assert len(weights) == total_days
     assert min(weights) >= 1
     assert date_sks == sorted(date_sks)
     # Holiday-season days should on average outweigh a flat baseline of 100.

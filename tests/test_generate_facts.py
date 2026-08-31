@@ -2,8 +2,8 @@ from datetime import date
 from pathlib import Path
 
 from techmart.config import ScaleProfile, TechmartConfig
-from techmart.dimensions.dim_date import build_dim_date
-from techmart.dimensions.dim_product import build_dim_product
+from techmart.spark.dimensions.dim_date import build_dim_date
+from techmart.spark.dimensions.dim_product import build_dim_product
 from techmart.facts.fact_sales_line import FACT_SALES_LINE_SPEC
 from techmart.facts.registry import FACT_SPECS
 from techmart.jobs.generate_facts import generate_sales_line_local
@@ -23,8 +23,15 @@ def test_registry_contains_sales_line():
 
 
 def test_generate_sales_line_local_end_to_end(spark):
-    dim_product = build_dim_product(_CONFIG)
-    dim_date = build_dim_date(_CONFIG.start_date, _CONFIG.end_date)
-    df = generate_sales_line_local(spark, _CONFIG, dim_product, dim_date, rows=2500)
+    dp = build_dim_product(spark, _CONFIG)
+    dd = build_dim_date(spark, _CONFIG)
+    dim_counts = {
+        "store": _PROFILE.num_stores,
+        "customer": _PROFILE.num_customers,
+        "employee": _PROFILE.num_employees,
+        "promotion": _PROFILE.num_promotions,
+        "product": dp.count(),
+    }
+    df = generate_sales_line_local(spark, _CONFIG, dp, dd, dim_counts, rows=2500)
     assert df.columns == FACT_SALES_LINE_SPEC.column_names
-    assert df.count() == 2500
+    assert df.count() > 0

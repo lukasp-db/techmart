@@ -1,8 +1,8 @@
 """Engine-agnostic calendar helpers for the Techmart retail 4-5-4 fiscal calendar.
 
-Pure Python — no Polars, no Spark.  Copied verbatim from
-``techmart.dimensions.dim_date`` so that the Spark builders can reuse the same
-logic without importing Polars.
+Pure Python — no Polars, no Spark.  Ported from the original Polars dim_date
+builder so that the Spark builders can reuse the same logic without any
+additional dependencies.
 """
 from __future__ import annotations
 

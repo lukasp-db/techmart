@@ -12,11 +12,14 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 from ...config import TechmartConfig
-from ...dimensions.product_support import COLORS
 from ...reference.taxonomy import subcategory_paths
 from ..framework import SparkColumn, SparkTableSpec
 from ..scd2 import scd2_columns, with_scd2_current
 
+_COLORS = [
+    "Black", "Silver", "White", "Space Gray", "Blue",
+    "Red", "Graphite", "Rose Gold", "Green", "Titanium",
+]
 _UOMS = ["EA", "EA", "EA", "PK", "BX"]
 _LIFECYCLE = ["Active", "Active", "Active", "Active", "Clearance", "Discontinued"]
 
@@ -149,7 +152,7 @@ def build_dim_product(spark: SparkSession, config: TechmartConfig) -> DataFrame:
         # --- vendor FK ---
         .withColumn("primary_vendor_sk", "long", minValue=1, maxValue=num_vendors, random=True)
         # --- physical attributes ---
-        .withColumn("color", "string", values=COLORS, random=True)
+        .withColumn("color", "string", values=_COLORS, random=True)
         .withColumn("weight_raw", "double", minValue=0.1, maxValue=20.0, random=True, omit=True)
         .withColumn("weight_kg", "double", expr="round(weight_raw, 2)", baseColumn="weight_raw")
         .withColumn("dim_len", "int", minValue=5, maxValue=60, random=True, omit=True)

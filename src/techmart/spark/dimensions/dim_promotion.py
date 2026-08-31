@@ -73,7 +73,8 @@ def build_dim_promotion(spark: SparkSession, config: TechmartConfig) -> DataFram
         # --- classification ---
         .withColumn("promo_type", "string", values=_PROMO_TYPES, random=True)
         .withColumn("discount_method", "string", values=_DISCOUNT_METHODS, random=True)
-        .withColumn("discount_value", "double", minValue=5.0, maxValue=50.0, random=True)
+        .withColumn("discount_value_raw", "double", minValue=5.0, maxValue=50.0, random=True, omit=True)
+        .withColumn("discount_value", "double", expr="round(discount_value_raw, 2)", baseColumn="discount_value_raw")
         # --- date window ---
         .withColumn("start_offset", "int", minValue=0, maxValue=start_offset_max, random=True, omit=True)
         .withColumn("duration", "int", minValue=3, maxValue=29, random=True, omit=True)

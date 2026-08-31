@@ -1,6 +1,6 @@
 from datetime import date
 
-from pyspark.sql.types import BooleanType, IntegerType, TimestampType
+from pyspark.sql.types import BooleanType, LongType, TimestampType
 
 from techmart.spark.scd2 import scd2_columns, with_scd2_current
 
@@ -23,7 +23,7 @@ def test_with_scd2_current_values(spark):
     assert isinstance(out.schema["effective_start_ts"].dataType, TimestampType)
     assert isinstance(out.schema["effective_end_ts"].dataType, TimestampType)
     assert isinstance(out.schema["is_current"].dataType, BooleanType)
-    assert isinstance(out.schema["version"].dataType, IntegerType)
+    assert isinstance(out.schema["version"].dataType, LongType)
     row = out.orderBy("store_sk").first()
     assert row["is_current"] is True and row["version"] == 1
     assert row["effective_end_ts"] is None

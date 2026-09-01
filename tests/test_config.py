@@ -68,9 +68,9 @@ def test_scale_profile_defaults_keep_positional_construction():
     assert p.web_events_target == 1000
 
 
-def test_finance_levers_default(tmp_path):
+def test_finance_levers_default():
     from techmart.config import load_config
-    import textwrap, pathlib
+    import pathlib
     p = pathlib.Path(__file__).parent.parent / "config" / "scale_profiles.yaml"
     cfg = load_config(p, "smoke")
     sp = cfg.scale_profile

@@ -1,7 +1,7 @@
 """fact_gl_actuals: GL actuals derived from real core facts + injected deltas."""
 from __future__ import annotations
 
-from pyspark.sql import DataFrame, SparkSession, Window, functions as F
+from pyspark.sql import DataFrame, SparkSession, functions as F
 
 from ..config import TechmartConfig
 from ..facts.gen import uniform_hash
@@ -68,7 +68,10 @@ def build_fact_gl_actuals(
     a = a.join(local_max, ["store_sk", "is_online"])
     a = a.withColumn(
         "shift_out",
-        F.when(F.col("pidx") < F.col("local_max_pidx"), F.lit(sp.timing_shift_pct) * F.col("last_week_gross")).otherwise(F.lit(0.0)),
+        F.when(F.col("pidx") < F.col("local_max_pidx"), F.lit(sp.timing_shift_pct) * F.col("last_week_gross")).otherwise(
+            # Gross conservation (Σ recognized_gross == Σ gross) holds iff pidx is gap-free within each (store, is_online) group — verified true at showcase density.
+            F.lit(0.0)
+        ),
     )
     shift_in = a.select(
         "store_sk", "is_online", (F.col("pidx") + F.lit(1)).alias("pidx"),

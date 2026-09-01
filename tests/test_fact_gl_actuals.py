@@ -6,7 +6,6 @@ from pyspark.sql import functions as F
 from techmart.config import ScaleProfile, TechmartConfig
 from techmart.spark.dimensions.dim_date import build_dim_date
 from techmart.spark.dimensions.dim_product import build_dim_product
-from techmart.spark.dimensions.dim_customer import build_dim_customer
 from techmart.facts.fact_sales_line import build_fact_sales_line
 from techmart.facts.fact_returns import build_fact_returns
 from techmart.facts.fact_inventory_movement import build_fact_inventory_movement

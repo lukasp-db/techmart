@@ -7,6 +7,9 @@ profiles:
     sales_lines_target: 75000000
     num_customers: 500000
     num_vendors: 1000
+    inventory_snapshot_days: 14
+    inventory_movements_target: 5000000
+    web_events_target: 300000000
   showcase:
     num_stores: 1000
     num_skus: 200000
@@ -14,6 +17,9 @@ profiles:
     sales_lines_target: 750000000
     num_customers: 5000000
     num_vendors: 5000
+    inventory_snapshot_days: 7
+    inventory_movements_target: 50000000
+    web_events_target: 3000000000
   smoke:
     num_stores: 5
     num_skus: 500
@@ -21,6 +27,9 @@ profiles:
     sales_lines_target: 50000
     num_customers: 1000
     num_vendors: 20
+    inventory_snapshot_days: 30
+    inventory_movements_target: 20000
+    web_events_target: 100000
   stress:
     num_stores: 2000
     num_skus: 500000
@@ -28,3 +37,6 @@ profiles:
     sales_lines_target: 3000000000
     num_customers: 20000000
     num_vendors: 10000
+    inventory_snapshot_days: 7
+    inventory_movements_target: 200000000
+    web_events_target: 10000000000

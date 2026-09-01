@@ -10,6 +10,12 @@ def target_table_name(spec: SparkTableSpec, catalog: str, schema_prefix: str) ->
     return f"{catalog}.{schema_prefix}{spec.schema}.{spec.name}"
 
 
+def table_comment_sql(target: str, grain: str) -> str:
+    """COMMENT ON TABLE statement carrying the row grain (Genie/BI metadata)."""
+    escaped = grain.replace("'", "''")
+    return f"COMMENT ON TABLE {target} IS '{escaped}'"
+
+
 def write_table_uc(
     spark: SparkSession,
     df: DataFrame,
@@ -29,4 +35,5 @@ def write_table_uc(
         .option("overwriteSchema", "true")
         .saveAsTable(target)
     )
+    spark.sql(table_comment_sql(target, spec.grain))
     return target

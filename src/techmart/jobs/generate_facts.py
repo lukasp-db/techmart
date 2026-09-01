@@ -7,8 +7,13 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 
 from ..config import TechmartConfig, load_config
+from ..facts.fact_fulfillment import FACT_FULFILLMENT_SPEC, build_fact_fulfillment
+from ..facts.fact_inventory_movement import FACT_INVENTORY_MOVEMENT_SPEC, build_fact_inventory_movement
+from ..facts.fact_inventory_snapshot import FACT_INVENTORY_SNAPSHOT_SPEC, build_fact_inventory_snapshot
+from ..facts.fact_loyalty_activity import FACT_LOYALTY_ACTIVITY_SPEC, build_fact_loyalty_activity
+from ..facts.fact_returns import FACT_RETURNS_SPEC, build_fact_returns
 from ..facts.fact_sales_line import FACT_SALES_LINE_SPEC, build_fact_sales_line
-from ..facts.lookups import date_seasonality_weights, product_economics
+from ..facts.fact_web_events import FACT_WEB_EVENTS_SPEC, build_fact_web_events
 from ..spark.framework import validate_spark_schema
 from ..spark.session import get_spark
 from ..spark.uc_write import write_table_uc
@@ -45,8 +50,8 @@ def generate_sales_line_local(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Serverless DAB entrypoint: read dims from UC, write fact_sales_line to UC."""
-    parser = argparse.ArgumentParser(description="Generate Techmart fact_sales_line.")
+    """Serverless DAB entrypoint: read dims from UC, write all core facts to UC."""
+    parser = argparse.ArgumentParser(description="Generate Techmart core facts.")
     parser.add_argument("--catalog", required=True)
     parser.add_argument("--schema-prefix", default="techmart_")
     parser.add_argument("--profile", default=None, help="Scale profile name.")
@@ -68,28 +73,74 @@ def main(argv: list[str] | None = None) -> int:
     dim_customer = spark.read.table(f"{core}.dim_customer")
     dim_employee = spark.read.table(f"{core}.dim_employee")
     dim_promotion = spark.read.table(f"{core}.dim_promotion")
+    dim_vendor = spark.read.table(f"{core}.dim_vendor")
 
     dim_counts = {
         "store": dim_store.count(),
         "customer": dim_customer.count(),
         "employee": dim_employee.count(),
         "promotion": dim_promotion.count(),
+        "vendor": dim_vendor.count(),
         "product": dim_product.count(),
     }
 
-    df = build_fact_sales_line(
+    # --- sales (anchor) ---
+    sales = build_fact_sales_line(
         spark, config,
         dim_product=dim_product,
         dim_date=dim_date,
         dim_counts=dim_counts,
     )
-    # Write via the shared helper so the non-notebook entrypoint stays identical
-    # to notebooks/generate_facts.py (validation + schema creation + column
-    # comments + overwriteSchema) rather than a bare saveAsTable.
+    target = write_table_uc(spark, sales, FACT_SALES_LINE_SPEC, config.catalog, config.schema_prefix)
+    print(f"wrote {target}")
+    # Read back the persisted table so sales-linked facts operate on the
+    # deterministic, written data (mirrors the notebook pattern).
+    sales = spark.read.table(f"{core}.fact_sales_line")
+
+    # --- standalone facts ---
     target = write_table_uc(
-        spark, df, FACT_SALES_LINE_SPEC, config.catalog, config.schema_prefix
+        spark,
+        build_fact_inventory_snapshot(spark, config, dim_store=dim_store, dim_product=dim_product, dim_date=dim_date),
+        FACT_INVENTORY_SNAPSHOT_SPEC, config.catalog, config.schema_prefix,
     )
     print(f"wrote {target}")
+
+    target = write_table_uc(
+        spark,
+        build_fact_inventory_movement(spark, config, dim_date=dim_date, dim_product=dim_product, dim_counts=dim_counts),
+        FACT_INVENTORY_MOVEMENT_SPEC, config.catalog, config.schema_prefix,
+    )
+    print(f"wrote {target}")
+
+    target = write_table_uc(
+        spark,
+        build_fact_web_events(spark, config, dim_date=dim_date, dim_counts=dim_counts),
+        FACT_WEB_EVENTS_SPEC, config.catalog, config.schema_prefix,
+    )
+    print(f"wrote {target}")
+
+    # --- sales-linked facts ---
+    target = write_table_uc(
+        spark,
+        build_fact_returns(spark, config, fact_sales_line=sales, dim_date=dim_date),
+        FACT_RETURNS_SPEC, config.catalog, config.schema_prefix,
+    )
+    print(f"wrote {target}")
+
+    target = write_table_uc(
+        spark,
+        build_fact_fulfillment(spark, config, fact_sales_line=sales, dim_date=dim_date),
+        FACT_FULFILLMENT_SPEC, config.catalog, config.schema_prefix,
+    )
+    print(f"wrote {target}")
+
+    target = write_table_uc(
+        spark,
+        build_fact_loyalty_activity(spark, config, fact_sales_line=sales, dim_customer=dim_customer, dim_date=dim_date),
+        FACT_LOYALTY_ACTIVITY_SPEC, config.catalog, config.schema_prefix,
+    )
+    print(f"wrote {target}")
+
     return 0
 
 

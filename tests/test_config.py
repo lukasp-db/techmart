@@ -45,3 +45,24 @@ def test_derived_employee_and_promotion_counts():
     cfg = load_config(PROFILES, "showcase")  # 1000 stores, 3 years history
     assert cfg.scale_profile.num_employees == 40 * 1000
     assert cfg.scale_profile.num_promotions == 60 * 3
+
+
+def test_scale_profiles_have_phase4_knobs():
+    profiles = load_profiles(PROFILES)
+    for name in ("smoke", "demo_lean", "showcase", "stress"):
+        p = profiles[name]
+        assert p.inventory_snapshot_days >= 1
+        assert p.inventory_movements_target >= 1
+        assert p.web_events_target >= 1
+    # smoke is intentionally tiny so the deploy proof is fast
+    smoke = profiles["smoke"]
+    assert smoke.inventory_snapshot_days == 30
+    assert smoke.inventory_movements_target == 20000
+    assert smoke.web_events_target == 100000
+
+
+def test_scale_profile_defaults_keep_positional_construction():
+    p = ScaleProfile("t", 5, 500, 1, 50000, 1000, 20)
+    assert p.inventory_snapshot_days == 7
+    assert p.inventory_movements_target == 1000
+    assert p.web_events_target == 1000

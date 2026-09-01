@@ -5,6 +5,7 @@ from pyspark.sql import DataFrame, SparkSession, functions as F
 
 from ..config import TechmartConfig
 from ..spark.framework import SparkColumn, SparkTableSpec
+from .gen import uniform_hash
 from .lookups import date_seasonality_weights, product_economics
 
 FACT_SALES_LINE_SPEC = SparkTableSpec(
@@ -82,6 +83,8 @@ def build_fact_sales_line(
         .withColumn("store_sk", "long", minValue=1, maxValue=dim_counts["store"], random=True)
         .withColumn("customer_sk", "long", minValue=1, maxValue=dim_counts["customer"], random=True)
         .withColumn("employee_sk", "long", minValue=1, maxValue=dim_counts["employee"], random=True)
+        # channel_sk order is fixed by dim_channel: 1=In-Store, 2=Web, 3=Mobile-App,
+        # 4=Marketplace, 5=Call-Center. is_marketplace (below) keys on channel_sk == 4.
         .withColumn(
             "channel_sk", "long",
             values=[1, 2, 3, 4, 5], weights=[50, 28, 15, 5, 2], random=True,
@@ -112,13 +115,7 @@ def build_fact_sales_line(
 
     def _u(salt: str) -> "Column":  # noqa: F821
         """Uniform pseudo-random double in [0, 1) keyed on (txn, line, salt)."""
-        return (
-            F.pmod(
-                F.hash(F.col("transaction_id"), F.col("line_number"), F.lit(salt)),
-                F.lit(1_000_000),
-            )
-            / F.lit(1_000_000.0)
-        )
+        return uniform_hash(F.col("transaction_id"), F.col("line_number"), salt=salt)
 
     lines = (
         lines

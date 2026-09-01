@@ -29,6 +29,11 @@ class ScaleProfile:
     markdown_rate: float = 0.015
     timing_shift_pct: float = 0.05
     budget_variance: float = 0.08
+    # AI layer levers (Phase 6).
+    num_reviews: int = 200
+    num_service_cases: int = 100
+    forecast_active_products: int = 200
+    forecast_horizon_weeks: int = 26
 
     @property
     def num_employees(self) -> int:

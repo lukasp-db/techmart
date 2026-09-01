@@ -78,3 +78,15 @@ def test_finance_levers_default():
     assert sp.markdown_rate == 0.015
     assert sp.timing_shift_pct == 0.05
     assert sp.budget_variance == 0.08
+
+
+def test_ai_levers_have_defaults_and_profile_values():
+    profiles = load_profiles(Path("config/scale_profiles.yaml"))
+    smoke = profiles["smoke"]
+    show = profiles["showcase"]
+    # defaults exist on the dataclass
+    assert smoke.num_reviews >= 1 and smoke.num_service_cases >= 1
+    assert smoke.forecast_active_products >= 1 and smoke.forecast_horizon_weeks >= 1
+    # showcase corpora are bounded (absolute counts, not a fraction of 750M lines)
+    assert show.num_reviews <= 200_000
+    assert show.num_service_cases <= 100_000

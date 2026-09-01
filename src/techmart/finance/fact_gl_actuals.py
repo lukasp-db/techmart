@@ -1,7 +1,7 @@
 """fact_gl_actuals: GL actuals derived from real core facts + injected deltas."""
 from __future__ import annotations
 
-from pyspark.sql import DataFrame, SparkSession, functions as F
+from pyspark.sql import DataFrame, SparkSession, Window, functions as F
 
 from ..config import TechmartConfig
 from ..facts.gen import uniform_hash
@@ -62,23 +62,26 @@ def build_fact_gl_actuals(
         .agg(F.sum("gross_sales_amount").alias("last_week_gross"))
     )
     a = a.join(lw, ["store_sk", "is_online", "pidx"], "left").fillna(0.0, ["last_week_gross"])
-    # Use LOCAL max_pidx per (store, is_online) group so that every shift_out has a
-    # corresponding successor row and the telescoping sum conserves total gross exactly.
-    local_max = a.groupBy("store_sk", "is_online").agg(F.max("pidx").alias("local_max_pidx"))
-    a = a.join(local_max, ["store_sk", "is_online"])
+    # Shift a slice of each period's last-week gross into the NEXT EXISTING period of the same
+    # (store, is_online) group. Ordering the shift over existing periods (via a window lag) rather
+    # than pidx+1 makes the telescoping sum conserve total gross exactly even when a group's periods
+    # are non-contiguous (gaps appear once sales spread across the full date range).
+    w = Window.partitionBy("store_sk", "is_online").orderBy("pidx")
+    a = a.withColumn("_rn", F.row_number().over(w))
+    grp_max = a.groupBy("store_sk", "is_online").agg(F.max("_rn").alias("_max_rn"))
+    a = a.join(grp_max, ["store_sk", "is_online"])
+    # No successor to receive a shift out of the group's last existing period, so zero it there.
     a = a.withColumn(
         "shift_out",
-        F.when(F.col("pidx") < F.col("local_max_pidx"), F.lit(sp.timing_shift_pct) * F.col("last_week_gross")).otherwise(
-            # Gross conservation (Σ recognized_gross == Σ gross) holds iff pidx is gap-free within each (store, is_online) group — verified true at showcase density.
-            F.lit(0.0)
-        ),
+        F.when(
+            F.col("_rn") < F.col("_max_rn"),
+            F.lit(sp.timing_shift_pct) * F.col("last_week_gross"),
+        ).otherwise(F.lit(0.0)),
     )
-    shift_in = a.select(
-        "store_sk", "is_online", (F.col("pidx") + F.lit(1)).alias("pidx"),
-        F.col("shift_out").alias("shift_in"),
-    )
-    a = a.join(shift_in, ["store_sk", "is_online", "pidx"], "left").fillna(0.0, ["shift_in"])
+    # shift_in is the previous existing period's shift_out (lag over the same ordering).
+    a = a.withColumn("shift_in", F.coalesce(F.lag("shift_out").over(w), F.lit(0.0)))
     a = a.withColumn("recognized_gross", F.col("gross") - F.col("shift_out") + F.col("shift_in"))
+    a = a.drop("_rn", "_max_rn")
     a = a.withColumn(
         "dept_name", F.when(F.col("is_online"), F.lit("E-commerce")).otherwise(F.lit("Merchandising"))
     )

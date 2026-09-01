@@ -20,3 +20,8 @@ targets:
     mode: development
     default: true
     # Host is supplied per-deploy (CLI --profile / DATABRICKS_HOST); never committed.
+    # dev defaults to the tiny `smoke` profile so routine `bundle run` is cheap/fast.
+    # Run showcase (or any profile) explicitly, e.g.:
+    #   databricks bundle run generate_facts -t dev -p <profile> --var="scale_profile=showcase"
+    variables:
+      scale_profile: smoke

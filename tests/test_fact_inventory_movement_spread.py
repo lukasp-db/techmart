@@ -25,5 +25,6 @@ def test_dates_are_decorrelated_from_store(spark):
     avg_d = (df.groupBy("store_sk").agg(F.countDistinct("date_sk").alias("d"))
                .agg(F.avg("d").alias("a")).first()["a"])
     # ~100 movements/store over ~730 dates: the correlated ("fixed") build collapses
-    # each store to a couple of distinct dates; decorrelated gives dozens.
+    # each store to ~8 distinct dates (avg_d ≈ 8.16, below the >10 threshold);
+    # decorrelated gives dozens.
     assert avg_d > 10, f"per-store distinct dates collapsed to {avg_d:.1f}"

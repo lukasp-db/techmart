@@ -36,7 +36,7 @@ def test_promotion_attrs_independent(spark):
     df = build_dim_promotion(spark, _cfg(history_years=2))  # 120 promotions
     combos = df.select("promo_type", "discount_method", "channel_scope",
                        "funding_source").distinct().count()
-    # fixed: ~10 combos; decorrelated: ~70 of the 5x3x3x2 grid.
+    # fixed: ~10 combos; decorrelated: ~57 of the 5x3x3x2 grid.
     assert combos > 30, f"promotion attr combos collapsed to {combos}"
 
 

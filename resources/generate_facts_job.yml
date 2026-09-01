@@ -1,24 +1,21 @@
 resources:
   jobs:
     generate_facts:
-      name: techmart-generate-facts
+      name: techmart-generate
       tasks:
-        - task_key: generate_sales_line
-          environment_key: default
-          spark_python_task:
-            python_file: ../src/techmart/jobs/generate_facts.py
-            parameters:
-              - "--catalog"
-              - "${var.catalog}"
-              - "--schema-prefix"
-              - "${var.schema_prefix}"
-              - "--profile"
-              - "${var.scale_profile}"
-      environments:
-        - environment_key: default
-          spec:
-            client: "3"
-            dependencies:
-              - dbldatagen>=0.4
-              - polars>=1.0.0
-              - pyyaml>=6.0
+        - task_key: generate_dims
+          notebook_task:
+            notebook_path: ../notebooks/generate_dims.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema_prefix: ${var.schema_prefix}
+              scale_profile: ${var.scale_profile}
+        - task_key: generate_facts
+          depends_on:
+            - task_key: generate_dims
+          notebook_task:
+            notebook_path: ../notebooks/generate_facts.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema_prefix: ${var.schema_prefix}
+              scale_profile: ${var.scale_profile}

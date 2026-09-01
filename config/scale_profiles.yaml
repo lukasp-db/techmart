@@ -14,6 +14,13 @@ profiles:
     sales_lines_target: 750000000
     num_customers: 5000000
     num_vendors: 5000
+  smoke:
+    num_stores: 5
+    num_skus: 500
+    history_years: 1
+    sales_lines_target: 50000
+    num_customers: 1000
+    num_vendors: 20
   stress:
     num_stores: 2000
     num_skus: 500000

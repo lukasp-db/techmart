@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-import polars as pl
-from pyspark.sql import DataFrame, SparkSession, functions as F
+from pyspark.sql import DataFrame, functions as F
 
 
-def polars_to_spark(spark: SparkSession, pl_df: pl.DataFrame) -> DataFrame:
-    """Convert a Polars DataFrame to a Spark DataFrame (via pandas)."""
-    return spark.createDataFrame(pl_df.to_pandas())
-
-
-def product_economics(spark: SparkSession, dim_product_pl: pl.DataFrame) -> DataFrame:
+def product_economics(dim_product_spark: DataFrame) -> DataFrame:
     """Per-SKU price/cost lookup for deriving realistic fact measures."""
-    econ = dim_product_pl.select(["product_sk", "list_price", "standard_cost", "msrp"])
-    return polars_to_spark(spark, econ)
+    return dim_product_spark.select("product_sk", "list_price", "standard_cost", "msrp")
 
 
 def date_seasonality_weights(dim_date: DataFrame) -> tuple[list[int], list[int]]:

@@ -4,16 +4,14 @@ import argparse
 import sys
 from pathlib import Path
 
-import polars as pl
 from pyspark.sql import DataFrame, SparkSession
 
 from ..config import TechmartConfig, load_config
 from ..facts.fact_sales_line import FACT_SALES_LINE_SPEC, build_fact_sales_line
-from ..facts.lookups import date_seasonality_weights, polars_to_spark, product_economics
-from ..spark.framework import validate_fact_schema
+from ..facts.lookups import date_seasonality_weights, product_economics
+from ..spark.framework import validate_spark_schema
 from ..spark.session import get_spark
-
-_DATE_WEIGHT_COLS = ["date_sk", "is_weekend", "selling_season", "holiday_name", "year"]
+from ..spark.uc_write import write_table_uc
 
 # config/ sits at the repo/bundle root, three levels up from this file
 # (jobs -> techmart -> src -> root). Works locally and when synced into a DAB.
@@ -23,21 +21,26 @@ _DEFAULT_PROFILES_PATH = Path(__file__).resolve().parents[3] / "config" / "scale
 def generate_sales_line_local(
     spark: SparkSession,
     config: TechmartConfig,
-    dim_product_pl: pl.DataFrame,
-    dim_date_pl: pl.DataFrame,
+    dim_product: DataFrame,
+    dim_date: DataFrame,
+    dim_counts: dict,
     *,
     rows: int | None = None,
 ) -> DataFrame:
-    """Assemble lookups from in-memory Polars dims and build the sales fact.
+    """Build the sales fact from Spark dim DataFrames.
 
-    Used by tests and local runs. On serverless, ``main`` reads the dims from
-    Unity Catalog instead (see below).
+    Used by tests and local runs. ``dim_counts`` gives the actual row counts
+    of each dimension table, guaranteeing RI by construction.  On serverless,
+    ``main`` reads all dims from Unity Catalog and derives these counts there.
     """
-    econ = product_economics(spark, dim_product_pl)
-    dd = polars_to_spark(spark, dim_date_pl.select(_DATE_WEIGHT_COLS))
-    weights = date_seasonality_weights(dd)
-    df = build_fact_sales_line(spark, config, product_econ=econ, date_weights=weights, rows=rows)
-    validate_fact_schema(df, FACT_SALES_LINE_SPEC)
+    df = build_fact_sales_line(
+        spark, config,
+        dim_product=dim_product,
+        dim_date=dim_date,
+        dim_counts=dim_counts,
+        rows=rows,
+    )
+    validate_spark_schema(df, FACT_SALES_LINE_SPEC)
     return df
 
 
@@ -58,30 +61,34 @@ def main(argv: list[str] | None = None) -> int:
     spark = get_spark("techmart-generate-facts")
     core = f"{config.catalog}.{config.schema_prefix}core"
 
+    # Read all dims from UC; derive FK cardinality from actual row counts.
     dim_product = spark.read.table(f"{core}.dim_product")
     dim_date = spark.read.table(f"{core}.dim_date")
+    dim_store = spark.read.table(f"{core}.dim_store")
+    dim_customer = spark.read.table(f"{core}.dim_customer")
+    dim_employee = spark.read.table(f"{core}.dim_employee")
+    dim_promotion = spark.read.table(f"{core}.dim_promotion")
 
-    # Referential integrity contract: fact FK ranges are sized from the scale
-    # profile (config), while the dims are read from UC. They MUST have been
-    # built under the same profile or FKs will point at non-existent rows.
-    # Guard the dimension we actually read; the others (store/customer/
-    # employee/promotion) share the same contract — see the plan's carry-forward
-    # for the Phase 4 "derive FK cardinality from the dims" hardening.
-    actual_skus = dim_product.count()
-    if actual_skus != config.scale_profile.num_skus:
-        raise ValueError(
-            f"dim_product has {actual_skus} rows but profile "
-            f"{config.scale_profile.name!r} expects {config.scale_profile.num_skus}; "
-            "regenerate the dims under the same --profile as this fact job."
-        )
+    dim_counts = {
+        "store": dim_store.count(),
+        "customer": dim_customer.count(),
+        "employee": dim_employee.count(),
+        "promotion": dim_promotion.count(),
+        "product": dim_product.count(),
+    }
 
-    econ = dim_product.select("product_sk", "list_price", "standard_cost", "msrp")
-    weights = date_seasonality_weights(dim_date.select(*_DATE_WEIGHT_COLS))
-    df = build_fact_sales_line(spark, config, product_econ=econ, date_weights=weights)
-    validate_fact_schema(df, FACT_SALES_LINE_SPEC)
-
-    target = f"{core}.{FACT_SALES_LINE_SPEC.name}"
-    df.write.mode("overwrite").saveAsTable(target)
+    df = build_fact_sales_line(
+        spark, config,
+        dim_product=dim_product,
+        dim_date=dim_date,
+        dim_counts=dim_counts,
+    )
+    # Write via the shared helper so the non-notebook entrypoint stays identical
+    # to notebooks/generate_facts.py (validation + schema creation + column
+    # comments + overwriteSchema) rather than a bare saveAsTable.
+    target = write_table_uc(
+        spark, df, FACT_SALES_LINE_SPEC, config.catalog, config.schema_prefix
+    )
     print(f"wrote {target}")
     return 0
 

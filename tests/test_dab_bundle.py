@@ -20,10 +20,23 @@ def test_databricks_yml_structure():
             assert "${" in str(target["host"]), "committed workspace host in target"
 
 
-def test_generate_facts_job_is_serverless():
-    job_doc = yaml.safe_load((_ROOT / "resources" / "generate_facts_job.yml").read_text())
-    job = job_doc["resources"]["jobs"]["generate_facts"]
-    task = job["tasks"][0]
-    # Serverless: no classic job_clusters; an environment or serverless task.
+def test_generate_facts_job_is_serverless_notebooks():
+    import yaml
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    job = yaml.safe_load((root / "resources" / "generate_facts_job.yml").read_text())["resources"]["jobs"]["generate_facts"]
     assert "job_clusters" not in job
-    assert "python_wheel_task" in task or "spark_python_task" in task
+    keys = {t["task_key"] for t in job["tasks"]}
+    assert {"generate_dims", "generate_facts"} <= keys
+    for t in job["tasks"]:
+        assert "notebook_task" in t
+    facts = next(t for t in job["tasks"] if t["task_key"] == "generate_facts")
+    assert any(d["task_key"] == "generate_dims" for d in facts.get("depends_on", []))
+
+
+def test_smoke_profile_exists():
+    import yaml
+    from pathlib import Path
+    profiles = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "scale_profiles.yaml").read_text())["profiles"]
+    assert "smoke" in profiles
+    assert profiles["smoke"]["num_stores"] <= 10

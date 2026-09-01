@@ -5,10 +5,6 @@ from techmart.facts.registry import FACT_SPECS
 from techmart.finance.registry import FINANCE_SPECS
 from techmart.semantic.metric_views import METRIC_VIEW_SPECS
 
-# Build a lookup of (schema, table) -> set(column names) from the real specs.
-_DIM_TABLES = {}  # filled below via a helper in the test
-
-
 def _all_specs():
     from techmart.spark.dimensions.dim_date import DIM_DATE_SPEC
     from techmart.spark.dimensions.dim_product import DIM_PRODUCT_SPEC

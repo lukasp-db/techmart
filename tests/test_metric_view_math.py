@@ -61,9 +61,6 @@ def test_inventory_measures(spark):
 
 
 def test_valuation_measures(spark):
-    schema = ("gmroi double, on_hand_cost_value double, markdown_amount double")
-    rows = [(2.0,), (4.0,), (6.0,)]
-    # need three columns; rebuild rows with all
     schema = "gmroi double, on_hand_cost_value double, markdown_amount double"
     rows = [(2.0, 10.0, 1.0), (4.0, 20.0, 2.0), (6.0, 30.0, 3.0)]
     m = _by_name(MV_INVENTORY_VALUATION)

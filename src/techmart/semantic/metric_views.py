@@ -78,7 +78,10 @@ MV_SALES = MetricViewSpec(
     comment="Sales performance metrics at transaction-line grain.",
     joins=(_JOIN_DATE, _JOIN_PRODUCT, _JOIN_STORE, _JOIN_CUSTOMER, _JOIN_CHANNEL, _JOIN_PROMO),
     dimensions=(
-        *_date_dims(), *_product_dims(), *_store_dims(),
+        *_date_dims(),
+        MetricField("is_weekend", "dim_date.is_weekend", "Weekend day flag", "Is Weekend"),
+        MetricField("is_holiday", "dim_date.is_holiday", "Holiday flag", "Is Holiday"),
+        *_product_dims(), *_store_dims(),
         MetricField("channel", "dim_channel.channel_name", "Sales channel", "Channel"),
         MetricField("channel_type", "dim_channel.channel_type",
                     "Channel type (Physical/Digital)", "Channel Type"),

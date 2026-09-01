@@ -6,7 +6,7 @@ testable; the actual execution (metric-view engine) is workspace-only.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # YAML 1.1 boolean-like keys that MUST be quoted so they round-trip as strings
 # (an unquoted `on:` key parses back as boolean True).

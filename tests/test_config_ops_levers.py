@@ -18,3 +18,4 @@ def test_ops_levers_scale_up():
     profiles = load_profiles(_YAML)
     assert profiles["smoke"].num_replen_orders <= profiles["showcase"].num_replen_orders
     assert profiles["smoke"].forecast_serving_rows <= profiles["showcase"].forecast_serving_rows
+    assert profiles["smoke"].num_forecast_overrides <= profiles["showcase"].num_forecast_overrides

@@ -84,10 +84,11 @@ def build_fact_loyalty_activity(
     ).unionByName(extra)
 
     # (customer_sk, activity_type, _src) is unique: one Earn per receipt and at most
-    # one non-Earn kind per source receipt, so the hashed id is collision-free.
+    # one non-Earn kind per source receipt, so the 64-bit xxhash64 id is collision-free
+    # at showcase scale (negligible birthday-bound probability over a 64-bit space).
     events = (
         events
-        .withColumn("loyalty_event_id", F.abs(F.hash("customer_sk", "activity_type", "_src")).cast("long"))
+        .withColumn("loyalty_event_id", F.xxhash64("customer_sk", "activity_type", "_src").cast("long"))
         .withColumn(
             "related_transaction_id",
             F.when(F.col("activity_type") == F.lit("Earn"), F.col("_src")).otherwise(F.lit(None).cast("long")),

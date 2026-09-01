@@ -76,7 +76,7 @@ def build_fact_sales_line(
             rows=num_transactions,
             partitions=partitions,
             randomSeed=seed,
-            randomSeedMethod="fixed",
+            randomSeedMethod="hash_fieldname",
         )
         .withIdOutput()
         .withColumn("date_sk", "long", values=date_sks, weights=weights, random=True)

@@ -10,6 +10,10 @@ profiles:
     inventory_snapshot_days: 14
     inventory_movements_target: 5000000
     web_events_target: 300000000
+    num_reviews: 20000
+    num_service_cases: 8000
+    forecast_active_products: 2000
+    forecast_horizon_weeks: 52
   showcase:
     num_stores: 1000
     num_skus: 200000
@@ -20,6 +24,10 @@ profiles:
     inventory_snapshot_days: 7
     inventory_movements_target: 50000000
     web_events_target: 3000000000
+    num_reviews: 100000
+    num_service_cases: 40000
+    forecast_active_products: 5000
+    forecast_horizon_weeks: 52
   smoke:
     num_stores: 5
     num_skus: 500
@@ -30,6 +38,10 @@ profiles:
     inventory_snapshot_days: 30
     inventory_movements_target: 20000
     web_events_target: 100000
+    num_reviews: 200
+    num_service_cases: 100
+    forecast_active_products: 100
+    forecast_horizon_weeks: 26
   stress:
     num_stores: 2000
     num_skus: 500000
@@ -40,3 +52,7 @@ profiles:
     inventory_snapshot_days: 7
     inventory_movements_target: 200000000
     web_events_target: 10000000000
+    num_reviews: 200000
+    num_service_cases: 100000
+    forecast_active_products: 10000
+    forecast_horizon_weeks: 78

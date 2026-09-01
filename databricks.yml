@@ -14,6 +14,11 @@ variables:
   scale_profile:
     description: Scale profile (smoke | demo_lean | showcase | stress).
     default: showcase
+  warehouse_id:
+    description: SQL warehouse id for the ai_query text-fill task (supplied per-deploy).
+  llm_endpoint:
+    description: Foundation Model endpoint for ai_query text generation.
+    default: databricks-meta-llama-3-1-8b-instruct
 
 targets:
   dev:

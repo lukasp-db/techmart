@@ -41,3 +41,14 @@ def test_generate_ops_notebook_covers_builders():
     assert "synced" in text.lower()  # documents the Delta->PG synced table
     for b in ["build_replenishment_order", "build_forecast_override"]:
         assert b in text
+
+
+def test_generate_semantic_notebook_covers_emitters():
+    text = _read("generate_semantic.py")
+    assert text.splitlines()[0] == "# Databricks notebook source"
+    assert "dbutils.widgets" in text
+    assert "metric_view_ddl" in text
+    assert "METRIC_VIEW_SPECS" in text
+    assert "TABLE_CONSTRAINTS" in text
+    assert "pk_ddl" in text and "fk_ddl" in text
+    assert "semantic" in text  # creates the techmart_semantic schema

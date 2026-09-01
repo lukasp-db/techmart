@@ -34,6 +34,10 @@ class ScaleProfile:
     num_service_cases: int = 100
     forecast_active_products: int = 200
     forecast_horizon_weeks: int = 26
+    # Ops write-back levers (Phase 5.3).
+    num_replen_orders: int = 50
+    num_forecast_overrides: int = 30
+    forecast_serving_rows: int = 500
 
     @property
     def num_employees(self) -> int:

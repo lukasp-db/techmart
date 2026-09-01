@@ -14,6 +14,9 @@ profiles:
     num_service_cases: 8000
     forecast_active_products: 2000
     forecast_horizon_weeks: 52
+    num_replen_orders: 5000
+    num_forecast_overrides: 2000
+    forecast_serving_rows: 50000
   showcase:
     num_stores: 1000
     num_skus: 200000
@@ -28,6 +31,9 @@ profiles:
     num_service_cases: 40000
     forecast_active_products: 5000
     forecast_horizon_weeks: 52
+    num_replen_orders: 50000
+    num_forecast_overrides: 20000
+    forecast_serving_rows: 500000
   smoke:
     num_stores: 5
     num_skus: 500
@@ -42,6 +48,9 @@ profiles:
     num_service_cases: 100
     forecast_active_products: 100
     forecast_horizon_weeks: 26
+    num_replen_orders: 50
+    num_forecast_overrides: 30
+    forecast_serving_rows: 500
   stress:
     num_stores: 2000
     num_skus: 500000
@@ -56,3 +65,6 @@ profiles:
     num_service_cases: 100000
     forecast_active_products: 10000
     forecast_horizon_weeks: 78
+    num_replen_orders: 200000
+    num_forecast_overrides: 80000
+    forecast_serving_rows: 2000000

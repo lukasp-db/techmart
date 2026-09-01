@@ -82,6 +82,8 @@ def build_fact_sales_line(
         .withColumn("store_sk", "long", minValue=1, maxValue=dim_counts["store"], random=True)
         .withColumn("customer_sk", "long", minValue=1, maxValue=dim_counts["customer"], random=True)
         .withColumn("employee_sk", "long", minValue=1, maxValue=dim_counts["employee"], random=True)
+        # channel_sk order is fixed by dim_channel: 1=In-Store, 2=Web, 3=Mobile-App,
+        # 4=Marketplace, 5=Call-Center. is_marketplace (below) keys on channel_sk == 4.
         .withColumn(
             "channel_sk", "long",
             values=[1, 2, 3, 4, 5], weights=[50, 28, 15, 5, 2], random=True,

@@ -38,7 +38,7 @@ FACT_SALES_LINE_SPEC = SparkTableSpec(
     ],
 )
 
-_AVG_BASKET = 2.9
+_AVG_BASKET = 2.97  # weighted mean of the basket-size distribution below
 _DISCOUNT_RATE = 0.12
 _TAX_RATE = 0.07
 

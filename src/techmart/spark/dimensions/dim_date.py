@@ -16,7 +16,7 @@ DIM_DATE_SPEC = SparkTableSpec(
     grain="one row per calendar day",
     columns=[
         SparkColumn("date_sk", "long", "Surrogate key in yyyymmdd form", is_key=True, nullable=False),
-        SparkColumn("date", "string", "Calendar date (ISO yyyy-mm-dd)", nullable=False),
+        SparkColumn("date", "date", "Calendar date", nullable=False),
         SparkColumn("day_of_week", "int", "ISO day of week (1=Mon..7=Sun)"),
         SparkColumn("day_name", "string", "Full day name (e.g. 'Monday')"),
         SparkColumn("week", "int", "ISO week number"),
@@ -45,7 +45,7 @@ def build_dim_date(spark: SparkSession, config: TechmartConfig) -> DataFrame:
         hn = holiday_name(d)
         rows.append((
             d.year * 10000 + d.month * 100 + d.day,
-            d.isoformat(),
+            d,  # native date -> Spark DateType (enables date math for BI/Genie)
             d.isoweekday(), _DAY_NAMES[d.weekday()], d.isocalendar()[1],
             d.month, _MONTH_NAMES[d.month - 1], (d.month - 1) // 3 + 1, d.year,
             fy, fw, fp, fq,

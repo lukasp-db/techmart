@@ -11,6 +11,7 @@ from ..facts.fact_sales_line import FACT_SALES_LINE_SPEC, build_fact_sales_line
 from ..facts.lookups import date_seasonality_weights, product_economics
 from ..spark.framework import validate_spark_schema
 from ..spark.session import get_spark
+from ..spark.uc_write import write_table_uc
 
 # config/ sits at the repo/bundle root, three levels up from this file
 # (jobs -> techmart -> src -> root). Works locally and when synced into a DAB.
@@ -82,10 +83,12 @@ def main(argv: list[str] | None = None) -> int:
         dim_date=dim_date,
         dim_counts=dim_counts,
     )
-    validate_spark_schema(df, FACT_SALES_LINE_SPEC)
-
-    target = f"{core}.{FACT_SALES_LINE_SPEC.name}"
-    df.write.mode("overwrite").saveAsTable(target)
+    # Write via the shared helper so the non-notebook entrypoint stays identical
+    # to notebooks/generate_facts.py (validation + schema creation + column
+    # comments + overwriteSchema) rather than a bare saveAsTable.
+    target = write_table_uc(
+        spark, df, FACT_SALES_LINE_SPEC, config.catalog, config.schema_prefix
+    )
     print(f"wrote {target}")
     return 0
 

@@ -12,7 +12,7 @@ variables:
     description: Schema name prefix (schemas are <prefix>core, <prefix>finance, ...).
     default: techmart_
   scale_profile:
-    description: Scale profile (demo_lean | showcase | stress).
+    description: Scale profile (smoke | demo_lean | showcase | stress).
     default: showcase
 
 targets:

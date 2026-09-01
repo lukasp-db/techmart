@@ -21,3 +21,13 @@ def test_dims_notebook_covers_all_dims():
     for b in ["build_dim_date", "build_dim_channel", "build_dim_store", "build_dim_vendor",
               "build_dim_promotion", "build_dim_employee", "build_dim_customer", "build_dim_product"]:
         assert b in text
+
+
+def test_generate_ai_notebook_covers_builders():
+    text = _read("generate_ai.py")
+    assert text.splitlines()[0] == "# Databricks notebook source"
+    assert "dbutils.widgets" in text
+    assert "write_table_uc" in text
+    for b in ["build_fact_sales_forecast", "build_ai_anomaly_catalog",
+              "build_product_review_staging", "build_service_case_staging"]:
+        assert b in text

@@ -48,3 +48,15 @@ resources:
               catalog: ${var.catalog}
               schema_prefix: ${var.schema_prefix}
               llm_endpoint: ${var.llm_endpoint}
+        - task_key: generate_ops
+          depends_on:
+            - task_key: generate_facts
+            - task_key: generate_ai
+          notebook_task:
+            notebook_path: ../notebooks/generate_ops.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema_prefix: ${var.schema_prefix}
+              scale_profile: ${var.scale_profile}
+              lakebase_instance: ${var.lakebase_instance}
+              lakebase_database: ${var.lakebase_database}

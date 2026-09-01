@@ -91,3 +91,33 @@ def test_smoke_profile_exists():
     profiles = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "scale_profiles.yaml").read_text())["profiles"]
     assert "smoke" in profiles
     assert profiles["smoke"]["num_stores"] <= 10
+
+
+def test_ops_bundle_variables_present():
+    import yaml
+    bundle = yaml.safe_load((_ROOT / "databricks.yml").read_text())
+    assert {"lakebase_instance", "lakebase_database"} <= set(bundle["variables"])
+    # lakebase_instance has NO committed default (supplied per-deploy, like host/warehouse_id)
+    inst = bundle["variables"]["lakebase_instance"]
+    assert "default" not in inst or inst.get("default") in (None, "")
+
+
+def test_lakebase_instance_resource_present():
+    import yaml
+    found = False
+    candidates = [_ROOT / "databricks.yml", *sorted((_ROOT / "resources").glob("*.yml"))]
+    for path in candidates:
+        doc = yaml.safe_load(path.read_text()) or {}
+        if "database_instances" in doc.get("resources", {}):
+            found = True
+    assert found, "no database_instances resource declared in the bundle"
+
+
+def test_ops_task_wired():
+    import yaml
+    job = yaml.safe_load((_ROOT / "resources" / "generate_facts_job.yml").read_text())["resources"]["jobs"]["generate_facts"]
+    by_key = {t["task_key"]: t for t in job["tasks"]}
+    assert "generate_ops" in by_key
+    deps = {d["task_key"] for d in by_key["generate_ops"].get("depends_on", [])}
+    assert deps == {"generate_facts", "generate_ai"}
+    assert by_key["generate_ops"]["notebook_task"]["notebook_path"].endswith("generate_ops.py")

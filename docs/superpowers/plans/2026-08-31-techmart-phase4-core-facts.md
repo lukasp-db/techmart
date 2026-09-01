@@ -1719,8 +1719,10 @@ def build_fact_web_events(
         .withIdOutput()
         .withColumn("date_sk", "long", values=date_sks, weights=weights, random=True)
         .withColumn("channel_sk", "long", values=[2, 3], weights=[60, 40], random=True)
-        .withColumn("device_num", "int", minValue=1, maxValue=3, random=True, omit=True)
-        .withColumn("referrer_num", "int", minValue=1, maxValue=5, random=True, omit=True)
+        # device_num / referrer_num are consumed in a post-build withColumn (F.col),
+        # so they must NOT be omitted from the built frame; they are dropped below.
+        .withColumn("device_num", "int", minValue=1, maxValue=3, random=True)
+        .withColumn("referrer_num", "int", minValue=1, maxValue=5, random=True)
         .withColumn("num_events", "int", values=[1, 2, 3, 4, 5, 6, 7, 8], weights=[22, 22, 18, 14, 10, 7, 4, 3], random=True)
         .build()
     )

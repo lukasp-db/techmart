@@ -41,3 +41,12 @@ def test_domain_values(spark):
     df = _build(spark)
     assert df.filter(~F.col("case_type").isin("Repair", "Warranty", "Support")).count() == 0
     assert df.filter((F.col("csat_score") < 1) | (F.col("csat_score") > 5)).count() == 0
+
+
+def test_csat_correlates_with_status(spark):
+    df = _build(spark)
+    resolved = df.filter(F.col("status").isin("Resolved", "Closed"))
+    unresolved = df.filter(F.col("status").isin("Open", "In-Progress"))
+    # Resolved/Closed skew high (4-5); Open/In-Progress skew low (1-3).
+    assert resolved.filter(F.col("csat_score") < 4).count() == 0
+    assert unresolved.filter(F.col("csat_score") > 3).count() == 0

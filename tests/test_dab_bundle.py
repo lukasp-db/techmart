@@ -76,6 +76,15 @@ def test_ai_tasks_wired_with_fanout():
     assert {d["task_key"] for d in txt.get("depends_on", [])} == {"generate_ai"}
 
 
+def test_ai_text_sql_applies_comments_to_final_tables():
+    sql = (_ROOT / "resources" / "generate_ai_text.sql").read_text()
+    # Both final tables are created with explicit column definitions + comments.
+    assert "ai.product_review'" in sql and "ai.service_case'" in sql
+    # Comments are present (Genie contract on the marquee tables).
+    assert sql.count("COMMENT") >= 18  # 9 + 9 column comments (+ 2 table comments)
+    assert "ai_query(:llm_endpoint" in sql
+
+
 def test_smoke_profile_exists():
     import yaml
     from pathlib import Path

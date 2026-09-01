@@ -84,8 +84,15 @@ def build_service_case_staging(
         .withColumn("case_type", _pick("ctype", _CASE_TYPES))
         .withColumn("channel", _pick("cchan", _CHANNELS))
         .withColumn("status", _pick("cstat", _STATUSES))
-        .withColumn("csat_score",
-                    bounded_int(F.col("transaction_id"), F.col("line_number"), salt="csat", lo=1, hi=5))
+        .withColumn(
+            "csat_score",
+            F.when(
+                F.col("status").isin("Resolved", "Closed"),
+                bounded_int(F.col("transaction_id"), F.col("line_number"), salt="csat_hi", lo=4, hi=5),
+            ).otherwise(
+                bounded_int(F.col("transaction_id"), F.col("line_number"), salt="csat_lo", lo=1, hi=3),
+            ),
+        )
         .withColumn(
             "notes_prompt",
             F.concat(

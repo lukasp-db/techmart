@@ -1,0 +1,7 @@
+# Bundle-provisioned Lakebase (managed Postgres) instance for techmart_ops write-back.
+# DAB database-instance resource support is validated on the workspace (proven-green gate).
+resources:
+  database_instances:
+    techmart_lakebase:
+      name: ${var.lakebase_instance}
+      capacity: ${var.lakebase_capacity}

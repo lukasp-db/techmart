@@ -19,6 +19,14 @@ variables:
   llm_endpoint:
     description: Foundation Model endpoint for ai_query text generation.
     default: databricks-meta-llama-3-1-8b-instruct
+  lakebase_instance:
+    description: Lakebase (Postgres) database instance name (supplied per-deploy).
+  lakebase_database:
+    description: Lakebase database name for techmart_ops write-back tables.
+    default: techmart
+  lakebase_capacity:
+    description: Lakebase instance capacity unit.
+    default: CU_1
 
 targets:
   dev:

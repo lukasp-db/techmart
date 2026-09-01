@@ -49,7 +49,7 @@ def build_fact_inventory_movement(
     gen = (
         dg.DataGenerator(
             spark, name="fact_inventory_movement", rows=n, partitions=partitions,
-            randomSeed=seed, randomSeedMethod="fixed",
+            randomSeed=seed, randomSeedMethod="hash_fieldname",
         )
         .withIdOutput()
         .withColumn("movement_id", "long", expr="id + 1", baseColumn="id")

@@ -1,12 +1,12 @@
 """Spark dim_promotion builder using dbldatagen + SCD2."""
 from __future__ import annotations
 
-import dbldatagen as dg
 from pyspark.sql import DataFrame, SparkSession
 
 from ...config import TechmartConfig
+from ..dim_builder import build_scd2_dim
 from ..framework import SparkColumn, SparkTableSpec
-from ..scd2 import scd2_columns, with_scd2_current
+from ..scd2 import scd2_columns
 
 _PROMO_TYPES = ["Markdown", "BOGO", "Bundle", "Coupon", "Vendor-Funded"]
 _DISCOUNT_METHODS = ["PercentOff", "AmountOff", "BuyOneGetOne"]
@@ -48,63 +48,54 @@ def build_dim_promotion(spark: SparkSession, config: TechmartConfig) -> DataFram
     # Number of distinct campaigns: n // 4 clamped to at least 2
     num_campaigns = max(n // 4, 2)
 
-    df = (
-        dg.DataGenerator(
-            spark,
-            name="dim_promotion",
-            rows=n,
-            partitions=max(1, min(64, n // 100_000)),
-            randomSeed=config.seed,
-            randomSeedMethod="fixed",
+    def add_columns(gen):
+        return (
+            gen
+            # --- surrogate / business keys ---
+            .withColumn("promotion_sk", "long", expr="id + 1", baseColumn="id")
+            .withColumn(
+                "promotion_id", "string",
+                expr="concat('PROMO', lpad(cast(id + 1 as string), 5, '0'))",
+                baseColumn="id",
+            )
+            .withColumn(
+                "promo_name", "string",
+                expr="concat('Promo PROMO', lpad(cast(id + 1 as string), 5, '0'))",
+                baseColumn="id",
+            )
+            # --- classification ---
+            .withColumn("promo_type", "string", values=_PROMO_TYPES, random=True)
+            .withColumn("discount_method", "string", values=_DISCOUNT_METHODS, random=True)
+            .withColumn("discount_value_raw", "double", minValue=5.0, maxValue=50.0, random=True, omit=True)
+            .withColumn("discount_value", "double", expr="round(discount_value_raw, 2)", baseColumn="discount_value_raw")
+            # --- date window ---
+            .withColumn("start_offset", "int", minValue=0, maxValue=start_offset_max, random=True, omit=True)
+            .withColumn("duration", "int", minValue=3, maxValue=29, random=True, omit=True)
+            .withColumn(
+                "start_date", "date",
+                expr=f"date_add(to_date('{start_iso}'), start_offset)",
+                baseColumn="start_offset",
+            )
+            .withColumn(
+                "end_date", "date",
+                expr=f"least(date_add(start_date, duration), to_date('{end_iso}'))",
+                baseColumn=["start_date", "duration"],
+            )
+            # --- scope / funding ---
+            .withColumn("channel_scope", "string", values=_CHANNEL_SCOPES, random=True)
+            .withColumn("funding_source", "string", values=_FUNDING, random=True)
+            # --- campaign (grouped promotions) ---
+            .withColumn("campaign_num", "int", minValue=1, maxValue=num_campaigns, random=True, omit=True)
+            .withColumn(
+                "campaign_id", "string",
+                expr="concat('CAMP', lpad(cast(campaign_num as string), 4, '0'))",
+                baseColumn="campaign_num",
+            )
+            .withColumn(
+                "campaign_name", "string",
+                expr="concat('Campaign ', lpad(cast(campaign_num as string), 4, '0'))",
+                baseColumn="campaign_num",
+            )
         )
-        .withIdOutput()
-        # --- surrogate / business keys ---
-        .withColumn("promotion_sk", "long", expr="id + 1", baseColumn="id")
-        .withColumn(
-            "promotion_id", "string",
-            expr="concat('PROMO', lpad(cast(id + 1 as string), 5, '0'))",
-            baseColumn="id",
-        )
-        .withColumn(
-            "promo_name", "string",
-            expr="concat('Promo PROMO', lpad(cast(id + 1 as string), 5, '0'))",
-            baseColumn="id",
-        )
-        # --- classification ---
-        .withColumn("promo_type", "string", values=_PROMO_TYPES, random=True)
-        .withColumn("discount_method", "string", values=_DISCOUNT_METHODS, random=True)
-        .withColumn("discount_value_raw", "double", minValue=5.0, maxValue=50.0, random=True, omit=True)
-        .withColumn("discount_value", "double", expr="round(discount_value_raw, 2)", baseColumn="discount_value_raw")
-        # --- date window ---
-        .withColumn("start_offset", "int", minValue=0, maxValue=start_offset_max, random=True, omit=True)
-        .withColumn("duration", "int", minValue=3, maxValue=29, random=True, omit=True)
-        .withColumn(
-            "start_date", "date",
-            expr=f"date_add(to_date('{start_iso}'), start_offset)",
-            baseColumn="start_offset",
-        )
-        .withColumn(
-            "end_date", "date",
-            expr=f"least(date_add(start_date, duration), to_date('{end_iso}'))",
-            baseColumn=["start_date", "duration"],
-        )
-        # --- scope / funding ---
-        .withColumn("channel_scope", "string", values=_CHANNEL_SCOPES, random=True)
-        .withColumn("funding_source", "string", values=_FUNDING, random=True)
-        # --- campaign (grouped promotions) ---
-        .withColumn("campaign_num", "int", minValue=1, maxValue=num_campaigns, random=True, omit=True)
-        .withColumn(
-            "campaign_id", "string",
-            expr="concat('CAMP', lpad(cast(campaign_num as string), 4, '0'))",
-            baseColumn="campaign_num",
-        )
-        .withColumn(
-            "campaign_name", "string",
-            expr="concat('Campaign ', lpad(cast(campaign_num as string), 4, '0'))",
-            baseColumn="campaign_num",
-        )
-        .build()
-        .drop("id")
-    )
-    df = with_scd2_current(df, config.start_date)
-    return DIM_PROMOTION_SPEC.select_ordered(df)
+
+    return build_scd2_dim(spark, config, DIM_PROMOTION_SPEC, n, add_columns)

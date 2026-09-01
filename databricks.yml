@@ -14,16 +14,18 @@ variables:
   scale_profile:
     description: Scale profile (smoke | demo_lean | showcase | stress).
     default: showcase
-  warehouse_id:
-    description: SQL warehouse id for the ai_query text-fill task (supplied per-deploy).
   llm_endpoint:
     description: Foundation Model endpoint for ai_query text generation.
     default: databricks-meta-llama-3-1-8b-instruct
   lakebase_instance:
-    description: Lakebase (Postgres) database instance name (supplied per-deploy).
+    description: Lakebase (Postgres) database instance name (bundle-provisioned).
+    default: techmart-lakebase
   lakebase_database:
     description: Lakebase database name for techmart_ops write-back tables.
     default: techmart
+  lakebase_catalog:
+    description: Unity Catalog name federating the Lakebase database (PG->lakehouse read-back).
+    default: techmart_lakebase
   lakebase_capacity:
     description: Lakebase instance capacity unit.
     default: CU_1

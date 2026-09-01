@@ -47,13 +47,31 @@ def test_generate_finance_task_wired():
     assert by_key["generate_finance"]["notebook_task"]["notebook_path"].endswith("generate_finance.py")
 
 
-def test_ai_bundle_variables_present():
+def test_ai_warehouse_provisioned_and_llm_var_present():
     import yaml
     bundle = yaml.safe_load((_ROOT / "databricks.yml").read_text())
-    assert {"warehouse_id", "llm_endpoint"} <= set(bundle["variables"])
-    # warehouse_id must have NO committed default (supplied per-deploy, like host)
-    wid = bundle["variables"]["warehouse_id"]
-    assert "default" not in wid or wid.get("default") in (None, "")
+    assert "llm_endpoint" in bundle["variables"]
+    # Self-contained: no pre-existing warehouse id is supplied per-deploy.
+    assert "warehouse_id" not in bundle["variables"]
+    # A serverless SQL warehouse resource is declared for the ai_query text task.
+    found = None
+    for path in [_ROOT / "databricks.yml", *sorted((_ROOT / "resources").glob("*.yml"))]:
+        doc = yaml.safe_load(path.read_text()) or {}
+        wh = doc.get("resources", {}).get("sql_warehouses")
+        if wh:
+            found = wh
+    assert found, "no sql_warehouses resource declared"
+    assert found["techmart_warehouse"].get("enable_serverless_compute") is True
+
+
+def test_lakebase_federation_catalog_present():
+    import yaml
+    found = False
+    for path in [_ROOT / "databricks.yml", *sorted((_ROOT / "resources").glob("*.yml"))]:
+        doc = yaml.safe_load(path.read_text()) or {}
+        if "database_catalogs" in doc.get("resources", {}):
+            found = True
+    assert found, "no database_catalogs (federation) resource declared"
 
 
 def test_ai_tasks_wired_with_fanout():
@@ -72,7 +90,7 @@ def test_ai_tasks_wired_with_fanout():
     assert "generate_ai_text" in by_key
     txt = by_key["generate_ai_text"]
     assert "sql_task" in txt
-    assert "${var.warehouse_id}" in str(txt["sql_task"].get("warehouse_id", ""))
+    assert "${resources.sql_warehouses.techmart_warehouse.id}" in str(txt["sql_task"].get("warehouse_id", ""))
     assert {d["task_key"] for d in txt.get("depends_on", [])} == {"generate_ai"}
 
 
@@ -97,9 +115,9 @@ def test_ops_bundle_variables_present():
     import yaml
     bundle = yaml.safe_load((_ROOT / "databricks.yml").read_text())
     assert {"lakebase_instance", "lakebase_database"} <= set(bundle["variables"])
-    # lakebase_instance has NO committed default (supplied per-deploy, like host/warehouse_id)
+    # lakebase_instance is now bundle-provisioned with a committed default (self-contained).
     inst = bundle["variables"]["lakebase_instance"]
-    assert "default" not in inst or inst.get("default") in (None, "")
+    assert inst.get("default"), "lakebase_instance should have a default (self-contained deploy)"
 
 
 def test_lakebase_instance_resource_present():
@@ -131,3 +149,16 @@ def test_semantic_task_wired():
     deps = {d["task_key"] for d in by_key["generate_semantic"].get("depends_on", [])}
     assert deps == {"generate_facts", "generate_finance", "generate_ai"}
     assert by_key["generate_semantic"]["notebook_task"]["notebook_path"].endswith("generate_semantic.py")
+
+
+def test_forecast_serving_synced_table_present():
+    import yaml
+    found = None
+    for path in [_ROOT / "databricks.yml", *sorted((_ROOT / "resources").glob("*.yml"))]:
+        doc = yaml.safe_load(path.read_text()) or {}
+        st = doc.get("resources", {}).get("synced_database_tables")
+        if st and "techmart_forecast_serving" in st:
+            found = st["techmart_forecast_serving"]
+    assert found, "no forecast_serving synced_database_tables resource"
+    assert found["spec"]["source_table_full_name"].endswith("ai.fact_sales_forecast")
+    assert "date_sk" in found["spec"]["primary_key_columns"]

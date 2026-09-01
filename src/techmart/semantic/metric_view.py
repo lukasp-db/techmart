@@ -29,6 +29,11 @@ class MetricJoin:
     schema: str
     table: str
     on: str
+    # Assert the join is many-to-one (each source row matches at most one joined
+    # row) so the optimizer can trust the cardinality and measures never fan out /
+    # double-count. Safe for every fact->dim join here: FK RI + unique dim PK.
+    # Emitted as `rely: {at_most_one_match: true}`. Not runtime-validated.
+    at_most_one_match: bool = True
 
 
 @dataclass(frozen=True)
@@ -124,12 +129,15 @@ def metric_view_ddl(spec: MetricViewSpec, *, catalog: str, schema_prefix: str) -
         "source": _qualify(catalog, schema_prefix, spec.source_schema, spec.source_table),
     }
     if spec.joins:
-        inner["joins"] = [
-            {"name": j.name,
-             "source": _qualify(catalog, schema_prefix, j.schema, j.table),
-             "on": j.on}
-            for j in spec.joins
-        ]
+        joins = []
+        for j in spec.joins:
+            jd = {"name": j.name,
+                  "source": _qualify(catalog, schema_prefix, j.schema, j.table),
+                  "on": j.on}
+            if j.at_most_one_match:
+                jd["rely"] = {"at_most_one_match": True}
+            joins.append(jd)
+        inner["joins"] = joins
     inner["dimensions"] = [_field_dict(d) for d in spec.dimensions]
     inner["measures"] = [_field_dict(m) for m in spec.measures]
     if spec.materialization is not None:

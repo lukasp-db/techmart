@@ -7,7 +7,7 @@ dbutils.widgets.text("scale_profile", "smoke")  # accepted for parity; unused by
 # COMMAND ----------
 from techmart.semantic.registry import METRIC_VIEW_SPECS, TABLE_CONSTRAINTS
 from techmart.semantic.metric_view import metric_view_ddl
-from techmart.semantic.constraints import drop_pk_ddl, fk_ddl, pk_ddl
+from techmart.semantic.constraints import drop_pk_ddl, fk_ddl, pk_ddl, set_not_null_ddls
 
 catalog = dbutils.widgets.get("catalog")
 schema_prefix = dbutils.widgets.get("schema_prefix")
@@ -17,9 +17,12 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema_prefix}semantic")
 
 # COMMAND ----------
 # --- informational PK/FK constraints (NOT ENFORCED RELY) on the gold tables ---
-# Pass 1: drop existing PK then add PK for every table.
-# Doing all PKs first ensures dim PKs exist before fact FKs reference them.
+# Pass 1: set PK columns NOT NULL (Delta columns default nullable), then drop any
+# existing PK and add the PK. Doing all PKs first ensures dim PKs exist before fact
+# FKs reference them.
 for tc in TABLE_CONSTRAINTS:
+    for stmt in set_not_null_ddls(tc, **kw):
+        spark.sql(stmt.rstrip(";"))
     spark.sql(drop_pk_ddl(tc, **kw).rstrip(";"))
     spark.sql(pk_ddl(tc, **kw).rstrip(";"))
     print("pk:", tc.schema, tc.table)

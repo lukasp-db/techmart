@@ -38,6 +38,18 @@ def _fk_name(tc: TableConstraints, fk: ForeignKey) -> str:
     return f"{tc.table}_{'_'.join(fk.columns)}_fk"
 
 
+def set_not_null_ddls(tc: TableConstraints, *, catalog: str, schema_prefix: str) -> list[str]:
+    """Emit `ALTER COLUMN ... SET NOT NULL` for each PK column.
+
+    A PRIMARY KEY constraint requires its columns to be NOT NULL at the table
+    level. Delta columns default to nullable even when the generating DataFrame
+    marks them non-nullable, so this must run before `pk_ddl`. Safe because PK
+    columns are non-null by construction (they are the grain keys).
+    """
+    table = _qualify(catalog, schema_prefix, tc.schema, tc.table)
+    return [f"ALTER TABLE {table} ALTER COLUMN {col} SET NOT NULL;" for col in tc.primary_key]
+
+
 def pk_ddl(tc: TableConstraints, *, catalog: str, schema_prefix: str) -> str:
     table = _qualify(catalog, schema_prefix, tc.schema, tc.table)
     cols = ", ".join(tc.primary_key)
@@ -48,8 +60,10 @@ def pk_ddl(tc: TableConstraints, *, catalog: str, schema_prefix: str) -> str:
 
 
 def drop_pk_ddl(tc: TableConstraints, *, catalog: str, schema_prefix: str) -> str:
+    # CASCADE so a re-run can drop a PK that fact FKs already reference (the FKs are
+    # re-added in pass 2). Harmless on a first run where no constraint exists yet.
     table = _qualify(catalog, schema_prefix, tc.schema, tc.table)
-    return f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {_pk_name(tc)};"
+    return f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {_pk_name(tc)} CASCADE;"
 
 
 def fk_ddl(tc: TableConstraints, fk: ForeignKey, *, catalog: str, schema_prefix: str) -> str:

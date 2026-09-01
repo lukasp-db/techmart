@@ -1,7 +1,41 @@
-# Bundle-provisioned Lakebase (managed Postgres) instance for techmart_ops write-back.
-# DAB database-instance resource support is validated on the workspace (proven-green gate).
+# Bundle-provisioned Lakebase (managed Postgres) for techmart_ops write-back.
+# Self-contained: the instance, its Unity Catalog federation catalog (PG->lakehouse
+# read-back), and the forecast_serving synced table (Delta->PG) are all declared here.
+# The writable tables (replenishment_order, forecast_override) are created + seeded via
+# psycopg in notebooks/generate_ops.py, into the database this catalog federates.
+#
+# The forecast_serving synced table (Delta->PG) requires its source table
+# (ai.fact_sales_forecast) to already exist: a bundle resource is created at deploy
+# time, so deploy this only after `bundle run generate_facts` has produced the source.
 resources:
   database_instances:
     techmart_lakebase:
       name: ${var.lakebase_instance}
       capacity: ${var.lakebase_capacity}
+
+  database_catalogs:
+    techmart_lakebase_catalog:
+      database_instance_name: ${resources.database_instances.techmart_lakebase.name}
+      name: ${var.lakebase_catalog}
+      database_name: ${var.lakebase_database}
+      create_database_if_not_exists: true
+
+  synced_database_tables:
+    techmart_forecast_serving:
+      name: ${var.lakebase_catalog}.public.forecast_serving
+      database_instance_name: ${resources.database_instances.techmart_lakebase.name}
+      logical_database_name: ${var.lakebase_database}
+      spec:
+        source_table_full_name: ${var.catalog}.${var.schema_prefix}ai.fact_sales_forecast
+        primary_key_columns:
+          - date_sk
+          - product_sk
+          - store_sk
+          - forecast_version
+        scheduling_policy: SNAPSHOT
+        create_database_objects_if_missing: true
+        # The backing DLT pipeline needs a UC storage location; point it at a
+        # catalog/schema with managed storage (the metastore may have no root URL).
+        new_pipeline_spec:
+          storage_catalog: ${var.catalog}
+          storage_schema: ${var.schema_prefix}ai

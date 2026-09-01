@@ -57,6 +57,8 @@ def test_inner_yaml_round_trips_with_quoted_on_key():
     # The join key MUST survive as the string "on", not boolean True.
     assert doc["joins"][0]["on"] == "source.date_sk = dim_date.date_sk"
     assert True not in doc["joins"][0]  # no bool key from an unquoted `on`
+    # Many-to-one cardinality hint (RELY analog) is emitted under rely.
+    assert doc["joins"][0]["rely"] == {"at_most_one_match": True}
 
 
 def test_dimensions_and_measures_present():

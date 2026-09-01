@@ -1,0 +1,12 @@
+# Bundle-provisioned serverless SQL warehouse for the ai_query text-fill task
+# (resources/generate_ai_text.sql). Self-contained: no pre-existing warehouse id
+# needs to be supplied per-deploy. Serverless + short auto-stop keeps it cheap.
+resources:
+  sql_warehouses:
+    techmart_warehouse:
+      name: techmart-serverless-sql
+      cluster_size: Small
+      enable_serverless_compute: true
+      warehouse_type: PRO
+      auto_stop_mins: 10
+      max_num_clusters: 1

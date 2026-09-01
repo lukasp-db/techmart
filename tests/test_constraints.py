@@ -43,5 +43,14 @@ def test_drop_pk_ddl_if_exists():
     sql = drop_pk_ddl(_TC, catalog="cat", schema_prefix="tm_")
     assert sql == (
         "ALTER TABLE cat.tm_core.fact_sales_line "
-        "DROP CONSTRAINT IF EXISTS fact_sales_line_pk;"
+        "DROP CONSTRAINT IF EXISTS fact_sales_line_pk CASCADE;"
     )
+
+
+def test_set_not_null_ddls():
+    from techmart.semantic.constraints import set_not_null_ddls
+    sqls = set_not_null_ddls(_TC, catalog="cat", schema_prefix="tm_")
+    assert sqls == [
+        "ALTER TABLE cat.tm_core.fact_sales_line ALTER COLUMN transaction_id SET NOT NULL;",
+        "ALTER TABLE cat.tm_core.fact_sales_line ALTER COLUMN line_number SET NOT NULL;",
+    ]

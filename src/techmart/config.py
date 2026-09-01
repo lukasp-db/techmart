@@ -21,6 +21,9 @@ class ScaleProfile:
     sales_lines_target: int
     num_customers: int
     num_vendors: int
+    inventory_snapshot_days: int = 7
+    inventory_movements_target: int = 1000
+    web_events_target: int = 1000
 
     @property
     def num_employees(self) -> int:

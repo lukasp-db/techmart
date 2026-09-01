@@ -121,3 +121,13 @@ def test_ops_task_wired():
     deps = {d["task_key"] for d in by_key["generate_ops"].get("depends_on", [])}
     assert deps == {"generate_facts", "generate_ai"}
     assert by_key["generate_ops"]["notebook_task"]["notebook_path"].endswith("generate_ops.py")
+
+
+def test_semantic_task_wired():
+    import yaml
+    job = yaml.safe_load((_ROOT / "resources" / "generate_facts_job.yml").read_text())["resources"]["jobs"]["generate_facts"]
+    by_key = {t["task_key"]: t for t in job["tasks"]}
+    assert "generate_semantic" in by_key
+    deps = {d["task_key"] for d in by_key["generate_semantic"].get("depends_on", [])}
+    assert deps == {"generate_facts", "generate_finance", "generate_ai"}
+    assert by_key["generate_semantic"]["notebook_task"]["notebook_path"].endswith("generate_semantic.py")

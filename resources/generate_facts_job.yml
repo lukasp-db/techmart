@@ -60,3 +60,14 @@ resources:
               scale_profile: ${var.scale_profile}
               lakebase_instance: ${var.lakebase_instance}
               lakebase_database: ${var.lakebase_database}
+        - task_key: generate_semantic
+          depends_on:
+            - task_key: generate_facts
+            - task_key: generate_finance
+            - task_key: generate_ai
+          notebook_task:
+            notebook_path: ../notebooks/generate_semantic.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema_prefix: ${var.schema_prefix}
+              scale_profile: ${var.scale_profile}

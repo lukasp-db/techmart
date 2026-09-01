@@ -28,3 +28,23 @@ resources:
               catalog: ${var.catalog}
               schema_prefix: ${var.schema_prefix}
               scale_profile: ${var.scale_profile}
+        - task_key: generate_ai
+          depends_on:
+            - task_key: generate_facts
+          notebook_task:
+            notebook_path: ../notebooks/generate_ai.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema_prefix: ${var.schema_prefix}
+              scale_profile: ${var.scale_profile}
+        - task_key: generate_ai_text
+          depends_on:
+            - task_key: generate_ai
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ../resources/generate_ai_text.sql
+            parameters:
+              catalog: ${var.catalog}
+              schema_prefix: ${var.schema_prefix}
+              llm_endpoint: ${var.llm_endpoint}

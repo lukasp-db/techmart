@@ -149,3 +149,16 @@ def test_semantic_task_wired():
     deps = {d["task_key"] for d in by_key["generate_semantic"].get("depends_on", [])}
     assert deps == {"generate_facts", "generate_finance", "generate_ai"}
     assert by_key["generate_semantic"]["notebook_task"]["notebook_path"].endswith("generate_semantic.py")
+
+
+def test_forecast_serving_synced_table_present():
+    import yaml
+    found = None
+    for path in [_ROOT / "databricks.yml", *sorted((_ROOT / "resources").glob("*.yml"))]:
+        doc = yaml.safe_load(path.read_text()) or {}
+        st = doc.get("resources", {}).get("synced_database_tables")
+        if st and "techmart_forecast_serving" in st:
+            found = st["techmart_forecast_serving"]
+    assert found, "no forecast_serving synced_database_tables resource"
+    assert found["spec"]["source_table_full_name"].endswith("ai.fact_sales_forecast")
+    assert "date_sk" in found["spec"]["primary_key_columns"]

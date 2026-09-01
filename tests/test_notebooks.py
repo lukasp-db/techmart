@@ -31,3 +31,13 @@ def test_generate_ai_notebook_covers_builders():
     for b in ["build_fact_sales_forecast", "build_ai_anomaly_catalog",
               "build_product_review_staging", "build_service_case_staging"]:
         assert b in text
+
+
+def test_generate_ops_notebook_covers_builders():
+    text = _read("generate_ops.py")
+    assert text.splitlines()[0] == "# Databricks notebook source"
+    assert "dbutils.widgets" in text
+    assert "write_pg" in text
+    assert "synced" in text.lower()  # documents the Delta->PG synced table
+    for b in ["build_replenishment_order", "build_forecast_override"]:
+        assert b in text

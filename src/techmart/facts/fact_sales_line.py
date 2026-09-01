@@ -5,6 +5,7 @@ from pyspark.sql import DataFrame, SparkSession, functions as F
 
 from ..config import TechmartConfig
 from ..spark.framework import SparkColumn, SparkTableSpec
+from .gen import uniform_hash
 from .lookups import date_seasonality_weights, product_economics
 
 FACT_SALES_LINE_SPEC = SparkTableSpec(
@@ -114,13 +115,7 @@ def build_fact_sales_line(
 
     def _u(salt: str) -> "Column":  # noqa: F821
         """Uniform pseudo-random double in [0, 1) keyed on (txn, line, salt)."""
-        return (
-            F.pmod(
-                F.hash(F.col("transaction_id"), F.col("line_number"), F.lit(salt)),
-                F.lit(1_000_000),
-            )
-            / F.lit(1_000_000.0)
-        )
+        return uniform_hash(F.col("transaction_id"), F.col("line_number"), salt=salt)
 
     lines = (
         lines

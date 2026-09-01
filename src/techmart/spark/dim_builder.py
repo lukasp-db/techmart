@@ -36,7 +36,7 @@ def build_scd2_dim(
         rows=rows,
         partitions=max(1, min(64, rows // 100_000)),
         randomSeed=config.seed,
-        randomSeedMethod="fixed",
+        randomSeedMethod="hash_fieldname",
     ).withIdOutput()
     df = add_columns(gen).build().drop("id")
     df = with_scd2_current(df, config.start_date)

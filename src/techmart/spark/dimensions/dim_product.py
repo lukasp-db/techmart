@@ -123,7 +123,7 @@ def build_dim_product(spark: SparkSession, config: TechmartConfig) -> DataFrame:
             rows=n,
             partitions=max(1, min(64, n // 100_000)),
             randomSeed=config.seed,
-            randomSeedMethod="fixed",
+            randomSeedMethod="hash_fieldname",
         )
         .withIdOutput()
         # --- surrogate / business keys ---

@@ -8,7 +8,7 @@ def _read(name):
 
 
 def test_notebooks_are_databricks_sources():
-    for name in ["generate_dims.py", "generate_facts.py"]:
+    for name in ["generate_dims.py", "generate_facts.py", "generate_finance.py"]:
         text = _read(name)
         assert text.splitlines()[0] == "# Databricks notebook source"
         assert "%pip install dbldatagen" in text

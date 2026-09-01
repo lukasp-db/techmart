@@ -34,6 +34,18 @@ def test_generate_facts_job_is_serverless_notebooks():
     assert any(d["task_key"] == "generate_dims" for d in facts.get("depends_on", []))
 
 
+def test_generate_finance_task_wired():
+    import yaml
+    import pathlib
+    y = yaml.safe_load((pathlib.Path(__file__).parent.parent / "resources" / "generate_facts_job.yml").read_text())
+    tasks = y["resources"]["jobs"]["generate_facts"]["tasks"]
+    by_key = {t["task_key"]: t for t in tasks}
+    assert "generate_finance" in by_key
+    deps = {d["task_key"] for d in by_key["generate_finance"].get("depends_on", [])}
+    assert "generate_facts" in deps
+    assert by_key["generate_finance"]["notebook_task"]["notebook_path"].endswith("generate_finance.py")
+
+
 def test_smoke_profile_exists():
     import yaml
     from pathlib import Path

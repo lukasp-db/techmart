@@ -19,3 +19,12 @@ resources:
               catalog: ${var.catalog}
               schema_prefix: ${var.schema_prefix}
               scale_profile: ${var.scale_profile}
+        - task_key: generate_finance
+          depends_on:
+            - task_key: generate_facts
+          notebook_task:
+            notebook_path: ../notebooks/generate_finance.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema_prefix: ${var.schema_prefix}
+              scale_profile: ${var.scale_profile}

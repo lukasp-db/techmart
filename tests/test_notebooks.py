@@ -51,4 +51,5 @@ def test_generate_semantic_notebook_covers_emitters():
     assert "METRIC_VIEW_SPECS" in text
     assert "TABLE_CONSTRAINTS" in text
     assert "pk_ddl" in text and "fk_ddl" in text
+    assert "set_not_null_ddls" in text  # PK cols set NOT NULL before ADD PK
     assert "semantic" in text  # creates the techmart_semantic schema

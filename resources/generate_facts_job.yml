@@ -41,7 +41,7 @@ resources:
           depends_on:
             - task_key: generate_ai
           sql_task:
-            warehouse_id: ${var.warehouse_id}
+            warehouse_id: ${resources.sql_warehouses.techmart_warehouse.id}
             file:
               path: ../resources/generate_ai_text.sql
             parameters:

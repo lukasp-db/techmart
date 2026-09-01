@@ -1,7 +1,21 @@
-# Bundle-provisioned Lakebase (managed Postgres) instance for techmart_ops write-back.
-# DAB database-instance resource support is validated on the workspace (proven-green gate).
+# Bundle-provisioned Lakebase (managed Postgres) for techmart_ops write-back.
+# Self-contained: the instance, its Unity Catalog federation catalog (PG->lakehouse
+# read-back), and the forecast_serving synced table (Delta->PG) are all declared here.
+# The writable tables (replenishment_order, forecast_override) are created + seeded via
+# psycopg in notebooks/generate_ops.py, into the database this catalog federates.
+#
+# NOTE: synced_database_tables is added in a second step, after generate_ai has created
+# the source table ai.fact_sales_forecast (a bundle resource is created at deploy time,
+# before the generation job runs, so the source must already exist).
 resources:
   database_instances:
     techmart_lakebase:
       name: ${var.lakebase_instance}
       capacity: ${var.lakebase_capacity}
+
+  database_catalogs:
+    techmart_lakebase_catalog:
+      database_instance_name: ${resources.database_instances.techmart_lakebase.name}
+      name: ${var.lakebase_catalog}
+      database_name: ${var.lakebase_database}
+      create_database_if_not_exists: true

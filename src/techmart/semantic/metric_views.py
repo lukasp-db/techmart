@@ -10,7 +10,7 @@ from .metric_view import (
     MaterializedView, Materialization, MetricField, MetricJoin, MetricViewSpec,
 )
 
-_CUR = {"type": "currency"}
+_CUR = {"type": "currency", "currency_code": "USD"}
 _PCT = {"type": "percentage"}
 
 

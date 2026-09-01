@@ -66,3 +66,15 @@ def test_scale_profile_defaults_keep_positional_construction():
     assert p.inventory_snapshot_days == 7
     assert p.inventory_movements_target == 1000
     assert p.web_events_target == 1000
+
+
+def test_finance_levers_default(tmp_path):
+    from techmart.config import load_config
+    import textwrap, pathlib
+    p = pathlib.Path(__file__).parent.parent / "config" / "scale_profiles.yaml"
+    cfg = load_config(p, "smoke")
+    sp = cfg.scale_profile
+    assert sp.allowance_rate == 0.010
+    assert sp.markdown_rate == 0.015
+    assert sp.timing_shift_pct == 0.05
+    assert sp.budget_variance == 0.08

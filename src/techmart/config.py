@@ -24,6 +24,11 @@ class ScaleProfile:
     inventory_snapshot_days: int = 7
     inventory_movements_target: int = 1000
     web_events_target: int = 1000
+    # Finance reconciliation levers (behavioral; shared across profiles via defaults).
+    allowance_rate: float = 0.010
+    markdown_rate: float = 0.015
+    timing_shift_pct: float = 0.05
+    budget_variance: float = 0.08
 
     @property
     def num_employees(self) -> int:

@@ -32,7 +32,7 @@
       "name": "ai_takeaways",
       "displayName": "AI key takeaways",
       "queryLines": [
-        "WITH agg AS (\n  SELECT MEASURE(net_sales) AS net_sales, MEASURE(gross_margin_pct) AS gm_pct, MEASURE(units) AS units\n  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)\n  GROUP BY ALL\n)\nSELECT ai_query(\n  :llm_endpoint,\n  CONCAT(\n    'You are a retail merchandising analyst. In 3 short bullet points, summarize ',\n    'these current-fiscal-year metrics for a VP of Merchandising and flag one risk. ',\n    'Net sales: ', CAST(ROUND(net_sales) AS STRING),\n    '. Gross margin %: ', CAST(ROUND(gm_pct*100,1) AS STRING),\n    '. Units: ', CAST(ROUND(units) AS STRING), '.'\n  )\n) AS takeaways\nFROM agg"
+        "WITH agg AS (\n  SELECT MEASURE(net_sales) AS net_sales, MEASURE(gross_margin_pct) AS gm_pct, MEASURE(units) AS units\n  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)\n  GROUP BY ALL\n)\nSELECT ai_query(\n  'databricks-meta-llama-3-1-8b-instruct',\n  CONCAT(\n    'You are a retail merchandising analyst. In 3 short bullet points, summarize ',\n    'these current-fiscal-year metrics for a VP of Merchandising and flag one risk. ',\n    'Net sales: ', CAST(ROUND(net_sales) AS STRING),\n    '. Gross margin %: ', CAST(ROUND(gm_pct*100,1) AS STRING),\n    '. Units: ', CAST(ROUND(units) AS STRING), '.'\n  )\n) AS takeaways\nFROM agg"
       ]
     }
   ],

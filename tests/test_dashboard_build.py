@@ -34,6 +34,11 @@ def test_dataset_querylines_survive_lakeview_concatenation():
         # the query keyword must begin a physical line (not hidden after a comment)
         assert any(line.lstrip().upper().startswith(("SELECT", "WITH"))
                    for line in raw.split("\n")), f"{ds['name']}: no SELECT/WITH at line start"
+        # no unbound named parameter may ship — Lakeview has no value for it
+        assert ":llm_endpoint" not in raw, f"{ds['name']}: unbound :llm_endpoint parameter"
+        import re
+        assert not re.search(r"(?<![:\w]):[a-zA-Z_]\w*", raw), \
+            f"{ds['name']}: unbound :parameter would error at runtime"
 
 def test_six_kpi_counters_present():
     d = build_dashboard()

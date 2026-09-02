@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from techmart.dashboards.datasets import DATASETS, WEEKS_PER_YEAR
+from techmart.dashboards.datasets import DATASETS, WEEKS_PER_YEAR, LLM_ENDPOINT_DEFAULT
 from techmart.dashboards.theme import ui_theme
 
 # ── number formats ─────────────────────────────────────────────────────────────
@@ -411,6 +411,9 @@ def _pack_query(lines: list[str]) -> list[str]:
     joined with real newline characters, with comment-only lines dropped.
     """
     sql = "\n".join(line for line in lines if not line.lstrip().startswith("--"))
+    # Lakeview datasets have no bound value for the :llm_endpoint placeholder, so
+    # inline the endpoint literal (an unbound :param errors at runtime).
+    sql = sql.replace(":llm_endpoint", f"'{LLM_ENDPOINT_DEFAULT}'")
     return [sql]
 
 

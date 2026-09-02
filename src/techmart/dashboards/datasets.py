@@ -14,6 +14,12 @@ Dataset = namedtuple("Dataset", "name display_name query_lines")
 
 WEEKS_PER_YEAR = 52.0  # annual basis for weeks-of-supply (trailing fiscal year)
 
+# Foundation-model endpoint for the AI-takeaways ai_query. The dataset SQL uses
+# the :llm_endpoint placeholder; build.py inlines this literal when packaging the
+# .lvdash.json (Lakeview datasets have no bound value for it). Matches the bundle
+# variable `llm_endpoint` default.
+LLM_ENDPOINT_DEFAULT = "databricks-meta-llama-3-1-8b-instruct"
+
 
 def sales_querylines() -> list[str]:
     return [

@@ -400,6 +400,20 @@ def _ai_takeaways(name: str, x: int, y: int, width: int, height: int) -> dict:
 
 # ── dashboard assembly ─────────────────────────────────────────────────────────
 
+def _pack_query(lines: list[str]) -> list[str]:
+    """Package dataset SQL as Lakeview ``queryLines``.
+
+    Lakeview concatenates ``queryLines`` WITHOUT inserting separators, so an
+    array of bare per-line strings merges tokens across breaks (``mv_sales`` +
+    ``GROUP``) and — worse — a leading ``--`` line comment comments out the rest
+    of the query on the single joined line, leaving the dataset blank and every
+    visualization empty. We therefore emit a SINGLE element holding the SQL
+    joined with real newline characters, with comment-only lines dropped.
+    """
+    sql = "\n".join(line for line in lines if not line.lstrip().startswith("--"))
+    return [sql]
+
+
 def build_dashboard() -> dict:
     """Return the complete merch exec Lakeview dashboard as a plain dict.
 
@@ -418,7 +432,7 @@ def build_dashboard() -> dict:
         {
             "name": ds.name,
             "displayName": ds.display_name,
-            "queryLines": ds.query_lines,
+            "queryLines": _pack_query(ds.query_lines),
         }
         for ds in DATASETS
     ]

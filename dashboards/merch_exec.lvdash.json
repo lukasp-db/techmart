@@ -4,124 +4,35 @@
       "name": "sales",
       "displayName": "Sales performance",
       "queryLines": [
-        "-- Sales flow by category x region x fiscal period",
-        "SELECT fiscal_year, fiscal_quarter, fiscal_period,",
-        "       division, department, category, region, channel_type,",
-        "       MEASURE(net_sales)        AS net_sales,",
-        "       MEASURE(gross_sales)      AS gross_sales,",
-        "       MEASURE(gross_margin)     AS gross_margin,",
-        "       MEASURE(gross_margin_pct) AS gross_margin_pct,",
-        "       MEASURE(cogs)             AS cogs,",
-        "       MEASURE(units)            AS units,",
-        "       MEASURE(transaction_count) AS transaction_count,",
-        "       MEASURE(discount_rate)    AS discount_rate",
-        "FROM mv_sales",
-        "GROUP BY ALL"
+        "SELECT fiscal_year, fiscal_quarter, fiscal_period,\n       division, department, category, region, channel_type,\n       MEASURE(net_sales)        AS net_sales,\n       MEASURE(gross_sales)      AS gross_sales,\n       MEASURE(gross_margin)     AS gross_margin,\n       MEASURE(gross_margin_pct) AS gross_margin_pct,\n       MEASURE(cogs)             AS cogs,\n       MEASURE(units)            AS units,\n       MEASURE(transaction_count) AS transaction_count,\n       MEASURE(discount_rate)    AS discount_rate\nFROM mv_sales\nGROUP BY ALL"
       ]
     },
     {
       "name": "inventory",
       "displayName": "Inventory position",
       "queryLines": [
-        "-- Current inventory position: latest snapshot only (stock, not summed over days)",
-        "SELECT division, department, category, region,",
-        "       MEASURE(on_hand_qty)          AS on_hand_qty,",
-        "       MEASURE(on_hand_cost_value)   AS on_hand_cost_value,",
-        "       MEASURE(on_hand_retail_value) AS on_hand_retail_value,",
-        "       MEASURE(out_of_stock_rate)    AS out_of_stock_rate,",
-        "       MEASURE(avg_days_of_supply)   AS avg_days_of_supply,",
-        "       MEASURE(sku_count)            AS sku_count",
-        "FROM mv_inventory",
-        "WHERE date = (SELECT MAX(date) FROM mv_inventory)",
-        "GROUP BY ALL"
+        "SELECT division, department, category, region,\n       MEASURE(on_hand_qty)          AS on_hand_qty,\n       MEASURE(on_hand_cost_value)   AS on_hand_cost_value,\n       MEASURE(on_hand_retail_value) AS on_hand_retail_value,\n       MEASURE(out_of_stock_rate)    AS out_of_stock_rate,\n       MEASURE(avg_days_of_supply)   AS avg_days_of_supply,\n       MEASURE(sku_count)            AS sku_count\nFROM mv_inventory\nWHERE date = (SELECT MAX(date) FROM mv_inventory)\nGROUP BY ALL"
       ]
     },
     {
       "name": "bridge",
       "displayName": "Sales ⋈ inventory bridge",
       "queryLines": [
-        "-- Cross-fact bridge at CATEGORY grain: trailing-fiscal-year sales flow ⋈ current",
-        "-- inventory position. Absolute ratios are kept for reference; productivity is shown",
-        "-- as INDICES vs the chain (100 = chain average) because absolute WOS/GMROI are not",
-        "-- calibrated to sales in this dataset.",
-        "WITH s AS (",
-        "  SELECT division, department, category,",
-        "         MEASURE(net_sales) AS net_sales, MEASURE(gross_margin) AS gross_margin,",
-        "         MEASURE(gross_margin_pct) AS gross_margin_pct, MEASURE(units) AS units,",
-        "         MEASURE(cogs) AS cogs",
-        "  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales) GROUP BY ALL",
-        "),",
-        "i AS (",
-        "  SELECT division, department, category,",
-        "         MEASURE(on_hand_qty) AS on_hand_qty, MEASURE(on_hand_cost_value) AS on_hand_cost_value,",
-        "         MEASURE(out_of_stock_rate) AS out_of_stock_rate",
-        "  FROM mv_inventory WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL",
-        "),",
-        "j AS (",
-        "  SELECT s.division, s.department, s.category, s.net_sales, s.gross_margin,",
-        "         s.gross_margin_pct, s.units, s.cogs, i.on_hand_qty, i.on_hand_cost_value,",
-        "         i.out_of_stock_rate,",
-        "         s.units / NULLIF(s.units + i.on_hand_qty, 0)                 AS sell_through_pct,",
-        "         (i.on_hand_qty * 52.0) / NULLIF(s.units, 0)      AS weeks_of_supply,",
-        "         s.gross_margin / NULLIF(i.on_hand_cost_value, 0)             AS gmroi,",
-        "         s.cogs / NULLIF(i.on_hand_cost_value, 0)                     AS inventory_turns",
-        "  FROM s LEFT JOIN i USING (division, department, category)",
-        ")",
-        "SELECT division, department, category, net_sales, gross_margin, gross_margin_pct,",
-        "       units, cogs, on_hand_qty, on_hand_cost_value, out_of_stock_rate,",
-        "       sell_through_pct, weeks_of_supply, gmroi, inventory_turns,",
-        "       100.0 * sell_through_pct",
-        "         / NULLIF(SUM(units) OVER () / NULLIF(SUM(units) OVER () + SUM(on_hand_qty) OVER (), 0), 0)   AS sell_through_index,",
-        "       100.0 * (SUM(on_hand_qty) OVER () / NULLIF(SUM(units) OVER (), 0))",
-        "         / NULLIF(on_hand_qty / NULLIF(units, 0), 0)                                                  AS inventory_efficiency_index,",
-        "       100.0 * gmroi",
-        "         / NULLIF(SUM(gross_margin) OVER () / NULLIF(SUM(on_hand_cost_value) OVER (), 0), 0)          AS gmroi_index",
-        "FROM j"
+        "WITH s AS (\n  SELECT division, department, category,\n         MEASURE(net_sales) AS net_sales, MEASURE(gross_margin) AS gross_margin,\n         MEASURE(gross_margin_pct) AS gross_margin_pct, MEASURE(units) AS units,\n         MEASURE(cogs) AS cogs\n  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales) GROUP BY ALL\n),\ni AS (\n  SELECT division, department, category,\n         MEASURE(on_hand_qty) AS on_hand_qty, MEASURE(on_hand_cost_value) AS on_hand_cost_value,\n         MEASURE(out_of_stock_rate) AS out_of_stock_rate\n  FROM mv_inventory WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL\n),\nj AS (\n  SELECT s.division, s.department, s.category, s.net_sales, s.gross_margin,\n         s.gross_margin_pct, s.units, s.cogs, i.on_hand_qty, i.on_hand_cost_value,\n         i.out_of_stock_rate,\n         s.units / NULLIF(s.units + i.on_hand_qty, 0)                 AS sell_through_pct,\n         (i.on_hand_qty * 52.0) / NULLIF(s.units, 0)      AS weeks_of_supply,\n         s.gross_margin / NULLIF(i.on_hand_cost_value, 0)             AS gmroi,\n         s.cogs / NULLIF(i.on_hand_cost_value, 0)                     AS inventory_turns\n  FROM s LEFT JOIN i USING (division, department, category)\n)\nSELECT division, department, category, net_sales, gross_margin, gross_margin_pct,\n       units, cogs, on_hand_qty, on_hand_cost_value, out_of_stock_rate,\n       sell_through_pct, weeks_of_supply, gmroi, inventory_turns,\n       100.0 * sell_through_pct\n         / NULLIF(SUM(units) OVER () / NULLIF(SUM(units) OVER () + SUM(on_hand_qty) OVER (), 0), 0)   AS sell_through_index,\n       100.0 * (SUM(on_hand_qty) OVER () / NULLIF(SUM(units) OVER (), 0))\n         / NULLIF(on_hand_qty / NULLIF(units, 0), 0)                                                  AS inventory_efficiency_index,\n       100.0 * gmroi\n         / NULLIF(SUM(gross_margin) OVER () / NULLIF(SUM(on_hand_cost_value) OVER (), 0), 0)          AS gmroi_index\nFROM j"
       ]
     },
     {
       "name": "lost_sales",
       "displayName": "Lost-sales risk",
       "queryLines": [
-        "-- Lost-sales risk: high out-of-stock AND high velocity, latest period.",
-        "WITH s AS (",
-        "  SELECT division, department, category, MEASURE(units) AS units, MEASURE(net_sales) AS net_sales",
-        "  FROM mv_sales",
-        "  WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
-        "    AND fiscal_period = (SELECT MAX(fiscal_period) FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales))",
-        "  GROUP BY ALL",
-        "),",
-        "i AS (",
-        "  SELECT division, department, category, MEASURE(out_of_stock_rate) AS out_of_stock_rate",
-        "  FROM mv_inventory WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL",
-        ")",
-        "SELECT s.division, s.department, s.category, s.units, s.net_sales, i.out_of_stock_rate",
-        "FROM s JOIN i USING (division, department, category)",
-        "ORDER BY (i.out_of_stock_rate * s.units) DESC",
-        "LIMIT 25"
+        "WITH s AS (\n  SELECT division, department, category, MEASURE(units) AS units, MEASURE(net_sales) AS net_sales\n  FROM mv_sales\n  WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)\n    AND fiscal_period = (SELECT MAX(fiscal_period) FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales))\n  GROUP BY ALL\n),\ni AS (\n  SELECT division, department, category, MEASURE(out_of_stock_rate) AS out_of_stock_rate\n  FROM mv_inventory WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL\n)\nSELECT s.division, s.department, s.category, s.units, s.net_sales, i.out_of_stock_rate\nFROM s JOIN i USING (division, department, category)\nORDER BY (i.out_of_stock_rate * s.units) DESC\nLIMIT 25"
       ]
     },
     {
       "name": "ai_takeaways",
       "displayName": "AI key takeaways",
       "queryLines": [
-        "-- AI Key Takeaways: LLM summary of the headline metrics (current fiscal year).",
-        "WITH agg AS (",
-        "  SELECT MEASURE(net_sales) AS net_sales, MEASURE(gross_margin_pct) AS gm_pct, MEASURE(units) AS units",
-        "  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
-        "  GROUP BY ALL",
-        ")",
-        "SELECT ai_query(",
-        "  :llm_endpoint,",
-        "  CONCAT(",
-        "    'You are a retail merchandising analyst. In 3 short bullet points, summarize ',",
-        "    'these current-fiscal-year metrics for a VP of Merchandising and flag one risk. ',",
-        "    'Net sales: ', CAST(ROUND(net_sales) AS STRING),",
-        "    '. Gross margin %: ', CAST(ROUND(gm_pct*100,1) AS STRING),",
-        "    '. Units: ', CAST(ROUND(units) AS STRING), '.'",
-        "  )",
-        ") AS takeaways",
-        "FROM agg"
+        "WITH agg AS (\n  SELECT MEASURE(net_sales) AS net_sales, MEASURE(gross_margin_pct) AS gm_pct, MEASURE(units) AS units\n  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)\n  GROUP BY ALL\n)\nSELECT ai_query(\n  :llm_endpoint,\n  CONCAT(\n    'You are a retail merchandising analyst. In 3 short bullet points, summarize ',\n    'these current-fiscal-year metrics for a VP of Merchandising and flag one risk. ',\n    'Net sales: ', CAST(ROUND(net_sales) AS STRING),\n    '. Gross margin %: ', CAST(ROUND(gm_pct*100,1) AS STRING),\n    '. Units: ', CAST(ROUND(units) AS STRING), '.'\n  )\n) AS takeaways\nFROM agg"
       ]
     }
   ],

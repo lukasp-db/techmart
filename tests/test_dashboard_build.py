@@ -18,6 +18,23 @@ def test_every_widget_binds_a_defined_dataset():
         for q in item["widget"].get("queries", []):
             assert q["query"]["datasetName"] in defined
 
+def test_dataset_querylines_survive_lakeview_concatenation():
+    # Lakeview joins queryLines WITHOUT inserting separators. A dataset must
+    # therefore carry its own newlines, must not be swallowed by a leading `--`
+    # line comment, and must not merge tokens across the join. Guards the deploy
+    # bug where the whole query rendered as a single commented-out line.
+    d = build_dashboard()
+    for ds in d["datasets"]:
+        raw = "".join(ds["queryLines"])                      # mimic Lakeview
+        assert raw.strip(), f"{ds['name']}: empty query"
+        assert "\n" in raw, f"{ds['name']}: no newlines — tokens will merge"
+        for line in raw.split("\n"):
+            assert not line.lstrip().startswith("--"), \
+                f"{ds['name']}: comment line survives — would comment out SQL"
+        # the query keyword must begin a physical line (not hidden after a comment)
+        assert any(line.lstrip().upper().startswith(("SELECT", "WITH"))
+                   for line in raw.split("\n")), f"{ds['name']}: no SELECT/WITH at line start"
+
 def test_six_kpi_counters_present():
     d = build_dashboard()
     counters = [it for it in d["pages"][0]["layout"]

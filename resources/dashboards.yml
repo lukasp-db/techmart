@@ -1,0 +1,13 @@
+# AI/BI dashboard, deployed from the generated .lvdash.json. dataset_catalog /
+# dataset_schema inject the target catalog+semantic schema so the dashboard's
+# dataset SQL stays unqualified (mv_sales, mv_inventory). llm_endpoint feeds the
+# AI-takeaways ai_query via a dashboard parameter.
+resources:
+  dashboards:
+    merch_exec:
+      display_name: "Techmart — Merchandising Executive"
+      file_path: ../dashboards/merch_exec.lvdash.json
+      warehouse_id: ${resources.sql_warehouses.techmart_warehouse.id}
+      dataset_catalog: ${var.catalog}
+      dataset_schema: ${var.schema_prefix}semantic
+      parent_path: /Workspace/Shared/techmart

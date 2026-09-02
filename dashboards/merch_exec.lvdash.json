@@ -1,0 +1,1339 @@
+{
+  "datasets": [
+    {
+      "name": "sales",
+      "displayName": "Sales performance",
+      "queryLines": [
+        "-- Sales flow by category x region x fiscal period",
+        "SELECT fiscal_year, fiscal_quarter, fiscal_period,",
+        "       division, department, category, region, channel_type,",
+        "       MEASURE(net_sales)        AS net_sales,",
+        "       MEASURE(gross_sales)      AS gross_sales,",
+        "       MEASURE(gross_margin)     AS gross_margin,",
+        "       MEASURE(gross_margin_pct) AS gross_margin_pct,",
+        "       MEASURE(cogs)             AS cogs,",
+        "       MEASURE(units)            AS units,",
+        "       MEASURE(transaction_count) AS transaction_count,",
+        "       MEASURE(discount_rate)    AS discount_rate",
+        "FROM mv_sales",
+        "GROUP BY ALL"
+      ]
+    },
+    {
+      "name": "inventory",
+      "displayName": "Inventory position",
+      "queryLines": [
+        "-- Current inventory position: latest snapshot only (stock, not summed over days)",
+        "SELECT division, department, category, region,",
+        "       MEASURE(on_hand_qty)          AS on_hand_qty,",
+        "       MEASURE(on_hand_cost_value)   AS on_hand_cost_value,",
+        "       MEASURE(on_hand_retail_value) AS on_hand_retail_value,",
+        "       MEASURE(out_of_stock_rate)    AS out_of_stock_rate,",
+        "       MEASURE(avg_days_of_supply)   AS avg_days_of_supply,",
+        "       MEASURE(sku_count)            AS sku_count",
+        "FROM mv_inventory",
+        "WHERE date = (SELECT MAX(date) FROM mv_inventory)",
+        "GROUP BY ALL"
+      ]
+    },
+    {
+      "name": "bridge",
+      "displayName": "Sales ⋈ inventory bridge",
+      "queryLines": [
+        "-- Cross-fact bridge at CATEGORY grain: trailing-fiscal-year sales flow ⋈ current",
+        "-- inventory position. Absolute ratios are kept for reference; productivity is shown",
+        "-- as INDICES vs the chain (100 = chain average) because absolute WOS/GMROI are not",
+        "-- calibrated to sales in this dataset.",
+        "WITH s AS (",
+        "  SELECT division, department, category,",
+        "         MEASURE(net_sales) AS net_sales, MEASURE(gross_margin) AS gross_margin,",
+        "         MEASURE(gross_margin_pct) AS gross_margin_pct, MEASURE(units) AS units,",
+        "         MEASURE(cogs) AS cogs",
+        "  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales) GROUP BY ALL",
+        "),",
+        "i AS (",
+        "  SELECT division, department, category,",
+        "         MEASURE(on_hand_qty) AS on_hand_qty, MEASURE(on_hand_cost_value) AS on_hand_cost_value,",
+        "         MEASURE(out_of_stock_rate) AS out_of_stock_rate",
+        "  FROM mv_inventory WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL",
+        "),",
+        "j AS (",
+        "  SELECT s.division, s.department, s.category, s.net_sales, s.gross_margin,",
+        "         s.gross_margin_pct, s.units, s.cogs, i.on_hand_qty, i.on_hand_cost_value,",
+        "         i.out_of_stock_rate,",
+        "         s.units / NULLIF(s.units + i.on_hand_qty, 0)                 AS sell_through_pct,",
+        "         (i.on_hand_qty * 52.0) / NULLIF(s.units, 0)      AS weeks_of_supply,",
+        "         s.gross_margin / NULLIF(i.on_hand_cost_value, 0)             AS gmroi,",
+        "         s.cogs / NULLIF(i.on_hand_cost_value, 0)                     AS inventory_turns",
+        "  FROM s LEFT JOIN i USING (division, department, category)",
+        ")",
+        "SELECT division, department, category, net_sales, gross_margin, gross_margin_pct,",
+        "       units, cogs, on_hand_qty, on_hand_cost_value, out_of_stock_rate,",
+        "       sell_through_pct, weeks_of_supply, gmroi, inventory_turns,",
+        "       100.0 * sell_through_pct",
+        "         / NULLIF(SUM(units) OVER () / NULLIF(SUM(units) OVER () + SUM(on_hand_qty) OVER (), 0), 0)   AS sell_through_index,",
+        "       100.0 * (SUM(on_hand_qty) OVER () / NULLIF(SUM(units) OVER (), 0))",
+        "         / NULLIF(on_hand_qty / NULLIF(units, 0), 0)                                                  AS inventory_efficiency_index,",
+        "       100.0 * gmroi",
+        "         / NULLIF(SUM(gross_margin) OVER () / NULLIF(SUM(on_hand_cost_value) OVER (), 0), 0)          AS gmroi_index",
+        "FROM j"
+      ]
+    },
+    {
+      "name": "lost_sales",
+      "displayName": "Lost-sales risk",
+      "queryLines": [
+        "-- Lost-sales risk: high out-of-stock AND high velocity, latest period.",
+        "WITH s AS (",
+        "  SELECT division, department, category, MEASURE(units) AS units, MEASURE(net_sales) AS net_sales",
+        "  FROM mv_sales",
+        "  WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
+        "    AND fiscal_period = (SELECT MAX(fiscal_period) FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales))",
+        "  GROUP BY ALL",
+        "),",
+        "i AS (",
+        "  SELECT division, department, category, MEASURE(out_of_stock_rate) AS out_of_stock_rate",
+        "  FROM mv_inventory WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL",
+        ")",
+        "SELECT s.division, s.department, s.category, s.units, s.net_sales, i.out_of_stock_rate",
+        "FROM s JOIN i USING (division, department, category)",
+        "ORDER BY (i.out_of_stock_rate * s.units) DESC",
+        "LIMIT 25"
+      ]
+    },
+    {
+      "name": "ai_takeaways",
+      "displayName": "AI key takeaways",
+      "queryLines": [
+        "-- AI Key Takeaways: LLM summary of the headline metrics (current fiscal year).",
+        "WITH agg AS (",
+        "  SELECT MEASURE(net_sales) AS net_sales, MEASURE(gross_margin_pct) AS gm_pct, MEASURE(units) AS units",
+        "  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
+        "  GROUP BY ALL",
+        ")",
+        "SELECT ai_query(",
+        "  :llm_endpoint,",
+        "  CONCAT(",
+        "    'You are a retail merchandising analyst. In 3 short bullet points, summarize ',",
+        "    'these current-fiscal-year metrics for a VP of Merchandising and flag one risk. ',",
+        "    'Net sales: ', CAST(ROUND(net_sales) AS STRING),",
+        "    '. Gross margin %: ', CAST(ROUND(gm_pct*100,1) AS STRING),",
+        "    '. Units: ', CAST(ROUND(units) AS STRING), '.'",
+        "  )",
+        ") AS takeaways",
+        "FROM agg"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "merch_exec",
+      "displayName": "Merch Executive",
+      "layout": [
+        {
+          "widget": {
+            "name": "filter_fiscal_year",
+            "queries": [
+              {
+                "name": "sales_q",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Fiscal Year",
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "sales_q"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_division",
+            "queries": [
+              {
+                "name": "sales_q",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "division",
+                      "expression": "`division`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "inventory_q",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "division",
+                      "expression": "`division`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "bridge_q",
+                "query": {
+                  "datasetName": "bridge",
+                  "fields": [
+                    {
+                      "name": "division",
+                      "expression": "`division`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "lost_sales_q",
+                "query": {
+                  "datasetName": "lost_sales",
+                  "fields": [
+                    {
+                      "name": "division",
+                      "expression": "`division`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Division",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "division",
+                    "displayName": "Division",
+                    "queryName": "sales_q"
+                  },
+                  {
+                    "fieldName": "division",
+                    "displayName": "Division",
+                    "queryName": "inventory_q"
+                  },
+                  {
+                    "fieldName": "division",
+                    "displayName": "Division",
+                    "queryName": "bridge_q"
+                  },
+                  {
+                    "fieldName": "division",
+                    "displayName": "Division",
+                    "queryName": "lost_sales_q"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_category",
+            "queries": [
+              {
+                "name": "sales_q",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "inventory_q",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "bridge_q",
+                "query": {
+                  "datasetName": "bridge",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "lost_sales_q",
+                "query": {
+                  "datasetName": "lost_sales",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Category",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "category",
+                    "displayName": "Category",
+                    "queryName": "sales_q"
+                  },
+                  {
+                    "fieldName": "category",
+                    "displayName": "Category",
+                    "queryName": "inventory_q"
+                  },
+                  {
+                    "fieldName": "category",
+                    "displayName": "Category",
+                    "queryName": "bridge_q"
+                  },
+                  {
+                    "fieldName": "category",
+                    "displayName": "Category",
+                    "queryName": "lost_sales_q"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_region",
+            "queries": [
+              {
+                "name": "sales_q",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "inventory_q",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Region",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "region",
+                    "displayName": "Region",
+                    "queryName": "sales_q"
+                  },
+                  {
+                    "fieldName": "region",
+                    "displayName": "Region",
+                    "queryName": "inventory_q"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_channel_type",
+            "queries": [
+              {
+                "name": "sales_q",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "channel_type",
+                      "expression": "`channel_type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Channel Type",
+                "showTitle": true
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "channel_type",
+                    "displayName": "Channel Type",
+                    "queryName": "sales_q"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_net_sales",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "net_sales",
+                      "expression": "SUM(`net_sales`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Net Sales",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "net_sales",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    },
+                    "abbreviation": "compact"
+                  },
+                  "displayName": "Net Sales"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_gross_margin_pct",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "gross_margin_pct",
+                      "expression": "SUM(`gross_margin`)/NULLIF(SUM(`net_sales`),0)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Gross Margin %",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "gross_margin_pct",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Gross Margin %"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_units",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "units",
+                      "expression": "SUM(`units`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Units",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "units",
+                  "format": {
+                    "type": "number-plain",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    },
+                    "abbreviation": "compact"
+                  },
+                  "displayName": "Units"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_avg_days_of_supply",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "avg_days_of_supply",
+                      "expression": "AVG(`avg_days_of_supply`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Avg Days of Supply",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_days_of_supply",
+                  "format": {
+                    "type": "number-plain",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    },
+                    "abbreviation": "compact"
+                  },
+                  "displayName": "Avg Days of Supply"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_on_hand_value",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "on_hand_cost_value",
+                      "expression": "SUM(`on_hand_cost_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "On-Hand Value",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "on_hand_cost_value",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    },
+                    "abbreviation": "compact"
+                  },
+                  "displayName": "On-Hand Value"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_oos_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "out_of_stock_rate",
+                      "expression": "AVG(`out_of_stock_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Out-of-Stock Rate",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "out_of_stock_rate",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Out-of-Stock Rate"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ai_takeaways_widget",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ai_takeaways",
+                  "fields": [
+                    {
+                      "name": "takeaways",
+                      "expression": "`takeaways`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "AI Key Takeaways",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "rowsPerPage": 25,
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "takeaways",
+                    "displayName": "Key Takeaways"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_sales_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "fiscal_period",
+                      "expression": "`fiscal_period`"
+                    },
+                    {
+                      "name": "net_sales",
+                      "expression": "SUM(`net_sales`)"
+                    },
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Net Sales Trend",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "fiscal_period",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Fiscal Period"
+                },
+                "y": {
+                  "fieldName": "net_sales",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Net Sales"
+                },
+                "color": {
+                  "fieldName": "fiscal_year",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Fiscal Year"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_sales_mix",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales",
+                  "fields": [
+                    {
+                      "name": "department",
+                      "expression": "`department`"
+                    },
+                    {
+                      "name": "net_sales",
+                      "expression": "SUM(`net_sales`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Net Sales by Department",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "department",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Department"
+                },
+                "y": {
+                  "fieldName": "net_sales",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Net Sales"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_category_ranking",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "bridge",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "net_sales",
+                      "expression": "`net_sales`"
+                    },
+                    {
+                      "name": "gross_margin_pct",
+                      "expression": "`gross_margin_pct`"
+                    },
+                    {
+                      "name": "units",
+                      "expression": "`units`"
+                    },
+                    {
+                      "name": "sell_through_index",
+                      "expression": "`sell_through_index`"
+                    },
+                    {
+                      "name": "inventory_efficiency_index",
+                      "expression": "`inventory_efficiency_index`"
+                    },
+                    {
+                      "name": "gmroi_index",
+                      "expression": "`gmroi_index`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Category Performance — indexed vs. chain (100 = avg)",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "rowsPerPage": 25,
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "category",
+                    "displayName": "Category"
+                  },
+                  {
+                    "fieldName": "net_sales",
+                    "displayName": "Net Sales",
+                    "format": {
+                      "type": "number-currency",
+                      "currencyCode": "USD",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "abbreviation": "compact"
+                    }
+                  },
+                  {
+                    "fieldName": "gross_margin_pct",
+                    "displayName": "GM %",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "units",
+                    "displayName": "Units",
+                    "format": {
+                      "type": "number-plain",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "abbreviation": "compact"
+                    }
+                  },
+                  {
+                    "fieldName": "sell_through_index",
+                    "displayName": "ST Index",
+                    "format": {
+                      "type": "number-plain",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "abbreviation": "compact"
+                    }
+                  },
+                  {
+                    "fieldName": "inventory_efficiency_index",
+                    "displayName": "Inv Eff Index",
+                    "format": {
+                      "type": "number-plain",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "abbreviation": "compact"
+                    }
+                  },
+                  {
+                    "fieldName": "gmroi_index",
+                    "displayName": "GMROI Index",
+                    "format": {
+                      "type": "number-plain",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "abbreviation": "compact"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_sell_through_index",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "bridge",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "sell_through_index",
+                      "expression": "SUM(`sell_through_index`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Top Categories by Sell-Through Index",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Category"
+                },
+                "y": {
+                  "fieldName": "sell_through_index",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Sell-Through Index"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 12,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_inventory_value",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "on_hand_cost_value",
+                      "expression": "SUM(`on_hand_cost_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Inventory Value by Category",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Category"
+                },
+                "y": {
+                  "fieldName": "on_hand_cost_value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "On-Hand Cost Value"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 23,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "chart_oos_by_region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "out_of_stock_rate",
+                      "expression": "AVG(`out_of_stock_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Out-of-Stock Rate by Region",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "region",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Region"
+                },
+                "y": {
+                  "fieldName": "out_of_stock_rate",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "OOS Rate"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 23,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "table_lost_sales",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "lost_sales",
+                  "fields": [
+                    {
+                      "name": "division",
+                      "expression": "`division`"
+                    },
+                    {
+                      "name": "department",
+                      "expression": "`department`"
+                    },
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "units",
+                      "expression": "`units`"
+                    },
+                    {
+                      "name": "net_sales",
+                      "expression": "`net_sales`"
+                    },
+                    {
+                      "name": "out_of_stock_rate",
+                      "expression": "`out_of_stock_rate`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Lost-Sales Risk (by category)",
+                "showTitle": true
+              },
+              "widgetType": "table",
+              "rowsPerPage": 25,
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "division",
+                    "displayName": "Division"
+                  },
+                  {
+                    "fieldName": "department",
+                    "displayName": "Department"
+                  },
+                  {
+                    "fieldName": "category",
+                    "displayName": "Category"
+                  },
+                  {
+                    "fieldName": "units",
+                    "displayName": "Units"
+                  },
+                  {
+                    "fieldName": "net_sales",
+                    "displayName": "Net Sales"
+                  },
+                  {
+                    "fieldName": "out_of_stock_rate",
+                    "displayName": "OOS Rate"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 29,
+            "width": 12,
+            "height": 7
+          }
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#FAF7F3",
+        "dark": "#241E28"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#2E2733"
+      },
+      "fontColor": {
+        "light": "#78566A",
+        "dark": "#E8E2E6"
+      },
+      "selectionColor": {
+        "light": "#47527B",
+        "dark": "#8F9CC1"
+      },
+      "visualizationColors": [
+        "#47527B",
+        "#707DA3",
+        "#8F9CC1",
+        "#ECA991",
+        "#CC928C",
+        "#78566A"
+      ]
+    }
+  }
+}

@@ -24,15 +24,20 @@ def test_six_kpi_counters_present():
                 if it["widget"].get("spec", {}).get("widgetType") == "counter"]
     assert len(counters) == 6
     titles = {c["widget"]["spec"]["frame"]["title"] for c in counters}
-    assert {"Net Sales", "Gross Margin %", "Units", "Sell-Through %",
-            "Weeks of Supply", "GMROI"} <= titles
+    assert {"Net Sales", "Gross Margin %", "Units", "Avg Days of Supply",
+            "On-Hand Value", "Out-of-Stock Rate"} <= titles
 
-def test_category_pivot_and_filters_bind_bridge():
+def test_category_ranking_table_binds_bridge_with_index_columns():
     d = build_dashboard()
     layout = d["pages"][0]["layout"]
-    pivots = [it for it in layout if it["widget"]["spec"].get("widgetType") == "pivot"]
-    assert len(pivots) == 1
-    assert pivots[0]["widget"]["queries"][0]["query"]["datasetName"] == "bridge"
+    bridge_tables = [
+        it for it in layout
+        if it["widget"]["spec"].get("widgetType") == "table"
+        and it["widget"]["queries"][0]["query"]["datasetName"] == "bridge"
+    ]
+    assert len(bridge_tables) == 1
+    table_fields = {f["name"] for f in bridge_tables[0]["widget"]["queries"][0]["query"]["fields"]}
+    assert {"sell_through_index", "inventory_efficiency_index", "gmroi_index"} <= table_fields
 
 def test_positions_do_not_overlap_and_fit_12_cols():
     d = build_dashboard()

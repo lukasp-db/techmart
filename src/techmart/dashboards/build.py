@@ -280,7 +280,7 @@ def _table(
     name: str,
     title: str,
     dataset: str,
-    columns: list[tuple[str, str]],
+    columns: list[tuple],
     x: int,
     y: int,
     width: int,
@@ -289,11 +289,19 @@ def _table(
 ) -> dict:
     """Simple data table widget.
 
-    *columns* is a list of (col_name, display_name) pairs; each column binds the
-    bare backtick-quoted column expression.
+    *columns* is a list of (col_name, display_name) or
+    (col_name, display_name, fmt_dict | None) tuples.  Each column binds the
+    bare backtick-quoted column expression.  An optional third element adds a
+    Lakeview format object to the encoding.
     """
-    fields = [{"name": col, "expression": f"`{col}`"} for col, _ in columns]
-    enc_columns = [{"fieldName": col, "displayName": label} for col, label in columns]
+    fields = [{"name": col_spec[0], "expression": f"`{col_spec[0]}`"} for col_spec in columns]
+    enc_columns = []
+    for col_spec in columns:
+        col, label = col_spec[0], col_spec[1]
+        entry: dict = {"fieldName": col, "displayName": label}
+        if len(col_spec) > 2 and col_spec[2] is not None:
+            entry["format"] = col_spec[2]
+        enc_columns.append(entry)
 
     return {
         "widget": {
@@ -325,43 +333,50 @@ def _table(
 def _filter(
     name: str,
     title: str,
-    dataset: str,
-    col: str,
+    datasets_cols: list[tuple[str, str]],
     widget_type: str,
     x: int,
     y: int,
     width: int,
     height: int,
 ) -> dict:
-    """Filter widget — single-select or multi-select.
+    """Filter widget — single-select or multi-select, optionally spanning multiple datasets.
+
+    *datasets_cols* is a list of (dataset_name, col_name) pairs.  One query is
+    emitted per pair so Lakeview cross-dataset filtering works; encodings.fields
+    also has one entry per pair pointing at the matching query.
 
     *widget_type* must be "filter-single-select" or "filter-multi-select".
     """
+    queries = [
+        {
+            "name": f"{ds}_q",
+            "query": {
+                "datasetName": ds,
+                "fields": [{"name": col, "expression": f"`{col}`"}],
+                "disaggregated": False,
+            },
+        }
+        for ds, col in datasets_cols
+    ]
+    enc_fields = [
+        {
+            "fieldName": col,
+            "displayName": title,
+            "queryName": f"{ds}_q",
+        }
+        for ds, col in datasets_cols
+    ]
     return {
         "widget": {
             "name": name,
-            "queries": [
-                {
-                    "name": "main_query",
-                    "query": {
-                        "datasetName": dataset,
-                        "fields": [{"name": col, "expression": f"`{col}`"}],
-                        "disaggregated": False,
-                    },
-                }
-            ],
+            "queries": queries,
             "spec": {
                 "version": 2,
                 "frame": {"title": title, "showTitle": True},
                 "widgetType": widget_type,
                 "encodings": {
-                    "fields": [
-                        {
-                            "fieldName": col,
-                            "displayName": title,
-                            "queryName": "main_query",
-                        }
-                    ],
+                    "fields": enc_fields,
                 },
             },
         },
@@ -393,7 +408,8 @@ def build_dashboard() -> dict:
       y=2  h=3   KPI row      (6 counters, width=2 each)
       y=5  h=4   AI takeaways (width=12)
       y=9  h=6   sales charts (trend line + mix bar, each width=6)
-      y=15 h=8   category pivot (width=12)
+      y=15 h=5   category ranking table — indexed vs. chain (width=12)
+      y=20 h=3   top categories by sell-through index bar (width=12)
       y=23 h=6   inventory charts (value bar + OOS bar, each width=6)
       y=29 h=7   lost-sales table (width=12)
     """
@@ -410,60 +426,71 @@ def build_dashboard() -> dict:
     layout: list[dict] = []
 
     # ── filter bar (y=0, h=2) ─────────────────────────────────────────────────
-    # fiscal_year: single-select; division/category/region → bridge;
-    # channel_type → sales (not present in bridge)
+    # fiscal_year: single-select → sales only (bridge has no fiscal_year column).
+    # division/category: cross-dataset → sales, inventory, bridge, lost_sales.
+    # region: cross-dataset → sales, inventory (bridge is now category grain, no region).
+    # channel_type: sales only.
     layout.append(_filter(
-        "filter_fiscal_year", "Fiscal Year", "sales", "fiscal_year",
+        "filter_fiscal_year", "Fiscal Year",
+        [("sales", "fiscal_year")],
         "filter-single-select", x=0, y=0, width=2, height=2,
     ))
     layout.append(_filter(
-        "filter_division", "Division", "bridge", "division",
+        "filter_division", "Division",
+        [("sales", "division"), ("inventory", "division"),
+         ("bridge", "division"), ("lost_sales", "division")],
         "filter-multi-select", x=2, y=0, width=2, height=2,
     ))
     layout.append(_filter(
-        "filter_category", "Category", "bridge", "category",
+        "filter_category", "Category",
+        [("sales", "category"), ("inventory", "category"),
+         ("bridge", "category"), ("lost_sales", "category")],
         "filter-multi-select", x=4, y=0, width=3, height=2,
     ))
     layout.append(_filter(
-        "filter_region", "Region", "bridge", "region",
+        "filter_region", "Region",
+        [("sales", "region"), ("inventory", "region")],
         "filter-multi-select", x=7, y=0, width=3, height=2,
     ))
     layout.append(_filter(
-        "filter_channel_type", "Channel Type", "sales", "channel_type",
+        "filter_channel_type", "Channel Type",
+        [("sales", "channel_type")],
         "filter-multi-select", x=10, y=0, width=2, height=2,
     ))
 
     # ── KPI counters (y=2, h=3, width=2 each) ─────────────────────────────────
-    # All bound to bridge; ratios computed from base columns (Ruling A).
+    # Realistic absolutes: first three from sales, last three from inventory.
+    # Cross-fact ratios (WOS/GMROI/sell-through) are not credible as absolutes
+    # on this dataset — they are shown as indices in the category ranking table.
     layout.append(_counter(
-        "kpi_net_sales", "Net Sales", "bridge",
+        "kpi_net_sales", "Net Sales", "sales",
         "SUM(`net_sales`)", "net_sales", _fmt_currency(),
         x=0, y=2,
     ))
     layout.append(_counter(
-        "kpi_gross_margin_pct", "Gross Margin %", "bridge",
+        "kpi_gross_margin_pct", "Gross Margin %", "sales",
         "SUM(`gross_margin`)/NULLIF(SUM(`net_sales`),0)", "gross_margin_pct",
         _fmt_percent(), x=2, y=2,
     ))
     layout.append(_counter(
-        "kpi_units", "Units", "bridge",
+        "kpi_units", "Units", "sales",
         "SUM(`units`)", "units", _fmt_plain(),
         x=4, y=2,
     ))
     layout.append(_counter(
-        "kpi_sell_through_pct", "Sell-Through %", "bridge",
-        "SUM(`units`)/NULLIF(SUM(`units`)+SUM(`on_hand_qty`),0)", "sell_through_pct",
-        _fmt_percent(), x=6, y=2,
+        "kpi_avg_days_of_supply", "Avg Days of Supply", "inventory",
+        "AVG(`avg_days_of_supply`)", "avg_days_of_supply", _fmt_plain(),
+        x=6, y=2,
     ))
     layout.append(_counter(
-        "kpi_weeks_of_supply", "Weeks of Supply", "bridge",
-        f"SUM(`on_hand_qty`)*{WEEKS_PER_YEAR}/NULLIF(SUM(`units`),0)", "weeks_of_supply",
-        _fmt_plain(), x=8, y=2,
+        "kpi_on_hand_value", "On-Hand Value", "inventory",
+        "SUM(`on_hand_cost_value`)", "on_hand_cost_value", _fmt_currency(),
+        x=8, y=2,
     ))
     layout.append(_counter(
-        "kpi_gmroi", "GMROI", "bridge",
-        "SUM(`gross_margin`)/NULLIF(SUM(`on_hand_cost_value`),0)", "gmroi",
-        _fmt_plain(), x=10, y=2,
+        "kpi_oos_rate", "Out-of-Stock Rate", "inventory",
+        "AVG(`out_of_stock_rate`)", "out_of_stock_rate", _fmt_percent(),
+        x=10, y=2,
     ))
 
     # ── AI takeaways (y=5, h=4, width=12) ────────────────────────────────────
@@ -493,10 +520,31 @@ def build_dashboard() -> dict:
         x=6, y=9, width=6, height=6,
     ))
 
-    # ── category performance pivot (y=15, h=8, width=12) ─────────────────────
-    layout.append(_pivot(
-        "pivot_category_matrix", "Category Performance Matrix",
-        x=0, y=15, width=12, height=8,
+    # ── category ranking table (y=15, h=5, width=12) ─────────────────────────
+    # Bare-column expressions — bridge is one row per category so no aggregation.
+    layout.append(_table(
+        "table_category_ranking",
+        "Category Performance — indexed vs. chain (100 = avg)",
+        "bridge",
+        columns=[
+            ("category", "Category"),
+            ("net_sales", "Net Sales", _fmt_currency()),
+            ("gross_margin_pct", "GM %", _fmt_percent()),
+            ("units", "Units", _fmt_plain()),
+            ("sell_through_index", "ST Index", _fmt_plain()),
+            ("inventory_efficiency_index", "Inv Eff Index", _fmt_plain()),
+            ("gmroi_index", "GMROI Index", _fmt_plain()),
+        ],
+        x=0, y=15, width=12, height=5,
+        rows_per_page=25,
+    ))
+
+    # ── top categories by sell-through index bar (y=20, h=3, width=12) ──────
+    layout.append(_bar(
+        "chart_sell_through_index", "Top Categories by Sell-Through Index", "bridge",
+        "category", "Category",
+        "SUM(`sell_through_index`)", "sell_through_index", "Sell-Through Index",
+        x=0, y=20, width=12, height=3,
     ))
 
     # ── inventory charts (y=23, h=6) ─────────────────────────────────────────

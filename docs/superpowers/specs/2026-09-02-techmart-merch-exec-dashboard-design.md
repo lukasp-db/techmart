@@ -223,3 +223,30 @@ non-empty text.
 - **lvdash.json authoring effort:** the schema is verbose; if hand-authoring proves
   brittle, build once in the UI on live data and export, then codify parameterization
   via `render.py`.
+
+---
+
+## Addendum (2026-09-02) — Indexed bridge (post-validation redesign)
+
+Live validation on showcase data revealed the synthetic inventory is uncalibrated to
+sales (every store carries every SKU; on-hand ≈ 35 "days" of an internal forecast running
+~280× hotter than actual `fact_sales_line` sales), so absolute cross-fact ratios
+(WOS ≈ 1400 wks, sell-through ≈ 3.5%, GMROI ≈ 0.035) are not demo-credible. Data is kept
+as-is; the metric is reframed (user decision):
+
+- **KPI tiles** show realistic absolutes only: Net Sales, Gross Margin %, Units (from `sales`);
+  Avg Days-of-Supply, On-Hand Value, Out-of-Stock Rate (native `inventory`). The broken
+  cross-fact ratios are NOT shown as single-value tiles.
+- **Cross-fact bridge stays the hero** but at **category grain**, presented as **indices vs.
+  the chain (100 = chain average)** and **category rankings**: `sell_through_index`,
+  `inventory_efficiency_index` (inverted WOS: higher = leaner), `gmroi_index`, computed with
+  total-based chain aggregates via `... OVER ()` window functions. Shown in a ranked category
+  table + a top-categories bar, alongside absolute Net Sales / GM% / Units.
+- The absolute ratio columns remain in the dataset (documentation/tooltip) but are not surfaced
+  as headline numbers.
+- Cross-dataset filtering (former parked item #2) is implemented here: division/category/region
+  filters carry one field per dataset that has the column, so the filter bar drives sales,
+  inventory, and bridge widgets together.
+- Follow-up (data foundation, separate): recalibrate `fact_inventory_snapshot` on-hand to real
+  sales velocity + sparse per-store assortment, after which absolute WOS/GMROI/turns become
+  credible and the index framing can revert to absolutes if desired.

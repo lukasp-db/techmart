@@ -56,7 +56,7 @@ def build_fact_web_events(
     header = (
         dg.DataGenerator(
             spark, name="web_session", rows=num_sessions, partitions=partitions,
-            randomSeed=seed, randomSeedMethod="fixed",
+            randomSeed=seed, randomSeedMethod="hash_fieldname",
         )
         .withIdOutput()
         .withColumn("date_sk", "long", values=date_sks, weights=weights, random=True)

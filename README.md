@@ -128,6 +128,7 @@ The same applies to `--var="catalog=<your_catalog>"` and any other variable.
 | `schema_prefix` | `techmart_` | schema name prefix |
 | `scale_profile` | `showcase` (dev target pins `smoke`) | dataset size |
 | `llm_endpoint` | `databricks-meta-llama-3-1-8b-instruct` | model for `ai_query` text-fill |
+| `warehouse_size` | `Small` | serverless SQL warehouse size for `ai_query` (bump to `Large` for `showcase`/`stress`) |
 | `lakebase_instance` | `techmart-lakebase` | provisioned Lakebase instance name |
 | `lakebase_database` | `techmart` | Lakebase database |
 | `lakebase_catalog` | `techmart_lakebase` | UC federation catalog over Lakebase |

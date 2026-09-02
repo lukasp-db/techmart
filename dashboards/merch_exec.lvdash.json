@@ -40,14 +40,16 @@
       "name": "bridge",
       "displayName": "Sales ⋈ inventory bridge",
       "queryLines": [
-        "-- Cross-fact bridge: period sales flow ⋈ current inventory position.",
-        "-- Sell-through/WOS/GMROI/turns require terms from both facts (NULLIF-guarded).",
+        "-- Cross-fact bridge: trailing-fiscal-year sales flow ⋈ current inventory position,",
+        "-- both at category x region grain so stock is counted ONCE (no per-period fan-out).",
         "WITH s AS (",
-        "  SELECT fiscal_year, fiscal_quarter, fiscal_period, division, department, category, region,",
+        "  SELECT division, department, category, region,",
         "         MEASURE(net_sales) AS net_sales, MEASURE(gross_margin) AS gross_margin,",
         "         MEASURE(gross_margin_pct) AS gross_margin_pct, MEASURE(units) AS units,",
         "         MEASURE(cogs) AS cogs",
-        "  FROM mv_sales GROUP BY ALL",
+        "  FROM mv_sales",
+        "  WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
+        "  GROUP BY ALL",
         "),",
         "i AS (",
         "  SELECT division, department, category, region,",
@@ -56,14 +58,13 @@
         "  FROM mv_inventory",
         "  WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL",
         ")",
-        "SELECT s.fiscal_year, s.fiscal_quarter, s.fiscal_period,",
-        "       s.division, s.department, s.category, s.region,",
+        "SELECT s.division, s.department, s.category, s.region,",
         "       s.net_sales, s.gross_margin, s.gross_margin_pct, s.units, s.cogs,",
         "       i.on_hand_qty, i.on_hand_cost_value, i.out_of_stock_rate,",
-        "       s.units / NULLIF(s.units + i.on_hand_qty, 0)                    AS sell_through_pct,",
-        "       (i.on_hand_qty * 4.333) / NULLIF(s.units, 0)      AS weeks_of_supply,",
-        "       s.gross_margin / NULLIF(i.on_hand_cost_value, 0)                AS gmroi,",
-        "       s.cogs / NULLIF(i.on_hand_cost_value, 0)                        AS inventory_turns",
+        "       s.units / NULLIF(s.units + i.on_hand_qty, 0)                 AS sell_through_pct,",
+        "       (i.on_hand_qty * 52.0) / NULLIF(s.units, 0)      AS weeks_of_supply,",
+        "       s.gross_margin / NULLIF(i.on_hand_cost_value, 0)             AS gmroi,",
+        "       s.cogs / NULLIF(i.on_hand_cost_value, 0)                     AS inventory_turns",
         "FROM s LEFT JOIN i USING (division, department, category, region)"
       ]
     },
@@ -74,7 +75,10 @@
         "-- Lost-sales risk: high out-of-stock AND high velocity, latest period.",
         "WITH s AS (",
         "  SELECT division, department, category, MEASURE(units) AS units, MEASURE(net_sales) AS net_sales",
-        "  FROM mv_sales WHERE fiscal_period = (SELECT MAX(fiscal_period) FROM mv_sales) GROUP BY ALL",
+        "  FROM mv_sales",
+        "  WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
+        "    AND fiscal_period = (SELECT MAX(fiscal_period) FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales))",
+        "  GROUP BY ALL",
         "),",
         "i AS (",
         "  SELECT division, department, category, MEASURE(out_of_stock_rate) AS out_of_stock_rate",
@@ -533,7 +537,7 @@
                   "fields": [
                     {
                       "name": "weeks_of_supply",
-                      "expression": "SUM(`on_hand_qty`)*4.333/NULLIF(SUM(`units`),0)"
+                      "expression": "SUM(`on_hand_qty`)*52.0/NULLIF(SUM(`units`),0)"
                     }
                   ],
                   "disaggregated": false
@@ -677,6 +681,10 @@
                     {
                       "name": "net_sales",
                       "expression": "SUM(`net_sales`)"
+                    },
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
                     }
                   ],
                   "disaggregated": false
@@ -704,6 +712,13 @@
                     "type": "quantitative"
                   },
                   "displayName": "Net Sales"
+                },
+                "color": {
+                  "fieldName": "fiscal_year",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Fiscal Year"
                 }
               }
             }
@@ -808,7 +823,7 @@
                     },
                     {
                       "name": "weeks_of_supply",
-                      "expression": "SUM(`on_hand_qty`)*4.333/NULLIF(SUM(`units`),0)"
+                      "expression": "SUM(`on_hand_qty`)*52.0/NULLIF(SUM(`units`),0)"
                     },
                     {
                       "name": "gmroi",

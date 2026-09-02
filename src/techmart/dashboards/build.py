@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
-from techmart.dashboards.datasets import DATASETS
+from techmart.dashboards.datasets import DATASETS, WEEKS_PER_YEAR
 from techmart.dashboards.theme import ui_theme
 
 # ── number formats ─────────────────────────────────────────────────────────────
@@ -221,7 +220,7 @@ def _pivot(
         {"name": "sell_through_pct",
          "expression": "SUM(`units`)/NULLIF(SUM(`units`)+SUM(`on_hand_qty`),0)"},
         {"name": "weeks_of_supply",
-         "expression": "SUM(`on_hand_qty`)*4.333/NULLIF(SUM(`units`),0)"},
+         "expression": f"SUM(`on_hand_qty`)*{WEEKS_PER_YEAR}/NULLIF(SUM(`units`),0)"},
         {"name": "gmroi",
          "expression": "SUM(`gross_margin`)/NULLIF(SUM(`on_hand_cost_value`),0)"},
         {"name": "out_of_stock_rate",
@@ -458,7 +457,7 @@ def build_dashboard() -> dict:
     ))
     layout.append(_counter(
         "kpi_weeks_of_supply", "Weeks of Supply", "bridge",
-        "SUM(`on_hand_qty`)*4.333/NULLIF(SUM(`units`),0)", "weeks_of_supply",
+        f"SUM(`on_hand_qty`)*{WEEKS_PER_YEAR}/NULLIF(SUM(`units`),0)", "weeks_of_supply",
         _fmt_plain(), x=8, y=2,
     ))
     layout.append(_counter(
@@ -471,12 +470,22 @@ def build_dashboard() -> dict:
     layout.append(_ai_takeaways("ai_takeaways_widget", x=0, y=5, width=12, height=4))
 
     # ── sales charts (y=9, h=6) ──────────────────────────────────────────────
-    layout.append(_line(
+    _sales_trend = _line(
         "chart_sales_trend", "Net Sales Trend", "sales",
         "fiscal_period", "Fiscal Period", "categorical",
         "SUM(`net_sales`)", "net_sales", "Net Sales",
         x=0, y=9, width=6, height=6,
-    ))
+    )
+    # Fix 4: add fiscal_year as categorical color series for year-over-year comparison.
+    _sales_trend["widget"]["queries"][0]["query"]["fields"].append(
+        {"name": "fiscal_year", "expression": "`fiscal_year`"}
+    )
+    _sales_trend["widget"]["spec"]["encodings"]["color"] = {
+        "fieldName": "fiscal_year",
+        "scale": {"type": "categorical"},
+        "displayName": "Fiscal Year",
+    }
+    layout.append(_sales_trend)
     layout.append(_bar(
         "chart_sales_mix", "Net Sales by Department", "sales",
         "department", "Department",

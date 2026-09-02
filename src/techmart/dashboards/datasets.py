@@ -12,7 +12,7 @@ from collections import namedtuple
 
 Dataset = namedtuple("Dataset", "name display_name query_lines")
 
-_WEEKS_PER_PERIOD = 4.333  # retail 4-4-5 fiscal period ≈ 4.33 weeks
+WEEKS_PER_YEAR = 52.0  # annual basis for weeks-of-supply (trailing fiscal year)
 
 
 def sales_querylines() -> list[str]:
@@ -51,14 +51,16 @@ def inventory_querylines() -> list[str]:
 
 def bridge_querylines() -> list[str]:
     return [
-        "-- Cross-fact bridge: period sales flow ⋈ current inventory position.",
-        "-- Sell-through/WOS/GMROI/turns require terms from both facts (NULLIF-guarded).",
+        "-- Cross-fact bridge: trailing-fiscal-year sales flow ⋈ current inventory position,",
+        "-- both at category x region grain so stock is counted ONCE (no per-period fan-out).",
         "WITH s AS (",
-        "  SELECT fiscal_year, fiscal_quarter, fiscal_period, division, department, category, region,",
+        "  SELECT division, department, category, region,",
         "         MEASURE(net_sales) AS net_sales, MEASURE(gross_margin) AS gross_margin,",
         "         MEASURE(gross_margin_pct) AS gross_margin_pct, MEASURE(units) AS units,",
         "         MEASURE(cogs) AS cogs",
-        "  FROM mv_sales GROUP BY ALL",
+        "  FROM mv_sales",
+        "  WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
+        "  GROUP BY ALL",
         "),",
         "i AS (",
         "  SELECT division, department, category, region,",
@@ -67,14 +69,13 @@ def bridge_querylines() -> list[str]:
         "  FROM mv_inventory",
         "  WHERE date = (SELECT MAX(date) FROM mv_inventory) GROUP BY ALL",
         ")",
-        "SELECT s.fiscal_year, s.fiscal_quarter, s.fiscal_period,",
-        "       s.division, s.department, s.category, s.region,",
+        "SELECT s.division, s.department, s.category, s.region,",
         "       s.net_sales, s.gross_margin, s.gross_margin_pct, s.units, s.cogs,",
         "       i.on_hand_qty, i.on_hand_cost_value, i.out_of_stock_rate,",
-        "       s.units / NULLIF(s.units + i.on_hand_qty, 0)                    AS sell_through_pct,",
-        f"       (i.on_hand_qty * {_WEEKS_PER_PERIOD}) / NULLIF(s.units, 0)      AS weeks_of_supply,",
-        "       s.gross_margin / NULLIF(i.on_hand_cost_value, 0)                AS gmroi,",
-        "       s.cogs / NULLIF(i.on_hand_cost_value, 0)                        AS inventory_turns",
+        "       s.units / NULLIF(s.units + i.on_hand_qty, 0)                 AS sell_through_pct,",
+        f"       (i.on_hand_qty * {WEEKS_PER_YEAR}) / NULLIF(s.units, 0)      AS weeks_of_supply,",
+        "       s.gross_margin / NULLIF(i.on_hand_cost_value, 0)             AS gmroi,",
+        "       s.cogs / NULLIF(i.on_hand_cost_value, 0)                     AS inventory_turns",
         "FROM s LEFT JOIN i USING (division, department, category, region)",
     ]
 
@@ -84,7 +85,10 @@ def lost_sales_querylines() -> list[str]:
         "-- Lost-sales risk: high out-of-stock AND high velocity, latest period.",
         "WITH s AS (",
         "  SELECT division, department, category, MEASURE(units) AS units, MEASURE(net_sales) AS net_sales",
-        "  FROM mv_sales WHERE fiscal_period = (SELECT MAX(fiscal_period) FROM mv_sales) GROUP BY ALL",
+        "  FROM mv_sales",
+        "  WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
+        "    AND fiscal_period = (SELECT MAX(fiscal_period) FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales))",
+        "  GROUP BY ALL",
         "),",
         "i AS (",
         "  SELECT division, department, category, MEASURE(out_of_stock_rate) AS out_of_stock_rate",

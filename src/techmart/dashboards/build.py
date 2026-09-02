@@ -413,7 +413,7 @@ def build_dashboard() -> dict:
     # fiscal_year: single-select; division/category/region → bridge;
     # channel_type → sales (not present in bridge)
     layout.append(_filter(
-        "filter_fiscal_year", "Fiscal Year", "bridge", "fiscal_year",
+        "filter_fiscal_year", "Fiscal Year", "sales", "fiscal_year",
         "filter-single-select", x=0, y=0, width=2, height=2,
     ))
     layout.append(_filter(

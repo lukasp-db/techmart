@@ -127,7 +127,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "bridge",
+                  "datasetName": "sales",
                   "fields": [
                     {
                       "name": "fiscal_year",

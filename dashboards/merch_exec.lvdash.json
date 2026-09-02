@@ -740,7 +740,7 @@
               }
             ],
             "spec": {
-              "version": 2,
+              "version": 3,
               "frame": {
                 "title": "Net Sales Trend",
                 "showTitle": true
@@ -801,7 +801,7 @@
               }
             ],
             "spec": {
-              "version": 2,
+              "version": 3,
               "frame": {
                 "title": "Net Sales by Department",
                 "showTitle": true
@@ -994,7 +994,7 @@
               }
             ],
             "spec": {
-              "version": 2,
+              "version": 3,
               "frame": {
                 "title": "Top Categories by Sell-Through Index",
                 "showTitle": true
@@ -1048,7 +1048,7 @@
               }
             ],
             "spec": {
-              "version": 2,
+              "version": 3,
               "frame": {
                 "title": "Inventory Value by Category",
                 "showTitle": true
@@ -1102,7 +1102,7 @@
               }
             ],
             "spec": {
-              "version": 2,
+              "version": 3,
               "frame": {
                 "title": "Out-of-Stock Rate by Region",
                 "showTitle": true

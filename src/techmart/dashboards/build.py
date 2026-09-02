@@ -117,7 +117,7 @@ def _bar(
                 }
             ],
             "spec": {
-                "version": 2,
+                "version": 3,
                 "frame": {"title": title, "showTitle": True},
                 "widgetType": "bar",
                 "encodings": {
@@ -171,7 +171,7 @@ def _line(
                 }
             ],
             "spec": {
-                "version": 2,
+                "version": 3,
                 "frame": {"title": title, "showTitle": True},
                 "widgetType": "line",
                 "encodings": {

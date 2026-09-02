@@ -18,6 +18,23 @@ def test_every_widget_binds_a_defined_dataset():
         for q in item["widget"].get("queries", []):
             assert q["query"]["datasetName"] in defined
 
+def test_widget_spec_versions_match_lakeview_constants():
+    # Lakeview validates spec.version against a per-widgetType constant; a wrong
+    # value makes the widget "invalid → reset to default" on import. Charts are 3,
+    # counters/tables/filters are 2.
+    required = {
+        "counter": 2, "table": 2, "pivot": 2,
+        "filter-single-select": 2, "filter-multi-select": 2,
+        "bar": 3, "line": 3, "pie": 3, "area": 3, "scatter": 3,
+    }
+    d = build_dashboard()
+    for item in d["pages"][0]["layout"]:
+        spec = item["widget"].get("spec", {})
+        wt = spec.get("widgetType")
+        if wt in required:
+            assert spec.get("version") == required[wt], \
+                f"{wt} widget has version {spec.get('version')}, expected {required[wt]}"
+
 def test_dataset_querylines_survive_lakeview_concatenation():
     # Lakeview joins queryLines WITHOUT inserting separators. A dataset must
     # therefore carry its own newlines, must not be swallowed by a leading `--`

@@ -72,7 +72,6 @@ def build_fact_web_events(
 
     devices_arr = F.array(*[F.lit(d) for d in _DEVICES])
     refs_arr = F.array(*[F.lit(r) for r in _REFERRERS])
-    types_arr = F.array(*[F.lit(t) for t in _EVENT_TYPES])
     terms_arr = F.array(*[F.lit(t) for t in _SEARCH_TERMS])
 
     header = (

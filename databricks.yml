@@ -17,6 +17,9 @@ variables:
   llm_endpoint:
     description: Foundation Model endpoint for ai_query text generation.
     default: databricks-meta-llama-3-1-8b-instruct
+  warehouse_size:
+    description: Serverless SQL warehouse cluster size for the ai_query text-fill (bump for larger scale profiles).
+    default: Small
   lakebase_instance:
     description: Lakebase (Postgres) database instance name (bundle-provisioned).
     default: techmart-lakebase

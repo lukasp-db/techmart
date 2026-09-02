@@ -106,6 +106,7 @@ def ai_takeaways_querylines() -> list[str]:
         "WITH agg AS (",
         "  SELECT MEASURE(net_sales) AS net_sales, MEASURE(gross_margin_pct) AS gm_pct, MEASURE(units) AS units",
         "  FROM mv_sales WHERE fiscal_year = (SELECT MAX(fiscal_year) FROM mv_sales)",
+        "  GROUP BY ALL",
         ")",
         "SELECT ai_query(",
         "  :llm_endpoint,",

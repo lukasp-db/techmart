@@ -21,9 +21,11 @@ class ScaleProfile:
     sales_lines_target: int
     num_customers: int
     num_vendors: int
-    inventory_snapshot_days: int = 7
     inventory_movements_target: int = 1000
     web_events_target: int = 1000
+    # Inventory snapshot levers (periodic, sales-calibrated).
+    assortment_rate: float = 0.30      # avg fraction of catalog a store carries
+    target_wos_weeks: int = 8          # target weeks-of-supply the on-hand calibration aims for
     # Finance reconciliation levers (behavioral; shared across profiles via defaults).
     allowance_rate: float = 0.010
     markdown_rate: float = 0.015

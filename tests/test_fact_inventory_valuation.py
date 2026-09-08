@@ -65,3 +65,13 @@ def test_deterministic(spark):
     a = _build(spark)[0].agg(F.count("*").alias("n"), F.round(F.sum("on_hand_cost_value"), 2).alias("s")).first()
     b = _build(spark)[0].agg(F.count("*").alias("n"), F.round(F.sum("on_hand_cost_value"), 2).alias("s")).first()
     assert a == b
+
+
+def test_valuation_spans_all_fiscal_periods(spark):
+    val, snap, dp, dd = _build(spark)
+    from techmart.finance.periods import period_end_lookup
+    n_periods = period_end_lookup(dd).count()
+    # valuation now carries every fiscal period-end, not just the one that used
+    # to fall inside the old 7-day snapshot window.
+    assert val.select("date_sk").distinct().count() == n_periods
+    assert n_periods >= 10

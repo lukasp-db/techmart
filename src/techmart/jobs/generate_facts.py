@@ -100,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     # --- standalone facts ---
     target = write_table_uc(
         spark,
-        build_fact_inventory_snapshot(spark, config, dim_store=dim_store, dim_product=dim_product, dim_date=dim_date),
+        build_fact_inventory_snapshot(spark, config, dim_store=dim_store, dim_product=dim_product, dim_date=dim_date, fact_sales_line=sales),
         FACT_INVENTORY_SNAPSHOT_SPEC, config.catalog, config.schema_prefix,
     )
     print(f"wrote {target}")

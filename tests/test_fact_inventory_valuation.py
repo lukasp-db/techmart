@@ -23,8 +23,8 @@ _COUNTS = {"store": 6, "customer": 300, "employee": _P.num_employees,
 def _build(spark):
     dd = build_dim_date(spark, _CFG); dp = build_dim_product(spark, _CFG)
     ds = build_dim_store(spark, _CFG)
-    snap = build_fact_inventory_snapshot(spark, _CFG, dim_store=ds, dim_product=dp, dim_date=dd)
     sales = build_fact_sales_line(spark, _CFG, dim_product=dp, dim_date=dd, dim_counts=_COUNTS, rows=4000)
+    snap = build_fact_inventory_snapshot(spark, _CFG, dim_store=ds, dim_product=dp, dim_date=dd, fact_sales_line=sales)
     val = build_fact_inventory_valuation(spark, _CFG, fact_inventory_snapshot=snap,
                                          fact_sales_line=sales, dim_product=dp, dim_date=dd)
     return val, snap, dp, dd

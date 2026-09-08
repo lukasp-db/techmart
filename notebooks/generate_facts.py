@@ -46,8 +46,9 @@ sales = build_fact_sales_line(spark, config, dim_product=dim_product, dim_date=d
 print("wrote", write_table_uc(spark, sales, FACT_SALES_LINE_SPEC, catalog, schema_prefix))
 sales = spark.read.table(f"{core}.fact_sales_line")
 
-# --- standalone facts ---
+# --- inventory snapshot (sales-linked) ---
 print("wrote", write_table_uc(spark, build_fact_inventory_snapshot(spark, config, dim_store=dim_store, dim_product=dim_product, dim_date=dim_date, fact_sales_line=sales), FACT_INVENTORY_SNAPSHOT_SPEC, catalog, schema_prefix))
+# --- standalone facts ---
 print("wrote", write_table_uc(spark, build_fact_inventory_movement(spark, config, dim_date=dim_date, dim_product=dim_product, dim_counts=dim_counts), FACT_INVENTORY_MOVEMENT_SPEC, catalog, schema_prefix))
 print("wrote", write_table_uc(spark, build_fact_web_events(spark, config, dim_date=dim_date, dim_counts=dim_counts), FACT_WEB_EVENTS_SPEC, catalog, schema_prefix))
 

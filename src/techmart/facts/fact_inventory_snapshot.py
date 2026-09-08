@@ -114,14 +114,20 @@ def build_fact_inventory_snapshot(
         .filter(uniform_hash(F.col("store_sk"), F.col("product_sk"), salt="assort") < F.col("_carry_prob"))
     )
 
-    # --- cross with period-ends; attach velocity + seasonal factor ---
+    # --- attach per-pair velocity BEFORE the period-end cross join (avg_daily is
+    #     date-independent, so this keeps the velocity shuffle on the ~assortment
+    #     rows instead of the full period-end grid) ---
+    assort = (
+        assort.join(velocity, ["store_sk", "product_sk"], "left")
+        .withColumn("_total_units", F.coalesce(F.col("_total_units"), F.lit(0)))
+        .withColumn("_avg_daily", F.greatest(F.col("_total_units") / F.lit(n_days), F.lit(_MIN_DAILY)))
+    )
+
+    # --- cross with period-ends; attach the per-period seasonal factor ---
     grid = (
         assort.crossJoin(pe)
-        .join(velocity, ["store_sk", "product_sk"], "left")
         .join(seasonal, "pidx", "left")
-        .withColumn("_total_units", F.coalesce(F.col("_total_units"), F.lit(0)))
         .withColumn("seasonal_factor", F.coalesce(F.col("seasonal_factor"), F.lit(1.0)))
-        .withColumn("_avg_daily", F.greatest(F.col("_total_units") / F.lit(n_days), F.lit(_MIN_DAILY)))
     )
 
     def cell(salt: str):

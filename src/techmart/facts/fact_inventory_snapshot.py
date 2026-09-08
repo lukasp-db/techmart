@@ -16,7 +16,7 @@ from .lookups import product_economics
 FACT_INVENTORY_SNAPSHOT_SPEC = SparkTableSpec(
     schema="core",
     name="fact_inventory_snapshot",
-    grain="one row per store, SKU, and day (stock position)",
+    grain="one row per store, SKU, and fiscal period-end (stock position)",
     columns=[
         SparkColumn("date_sk", "long", "Snapshot date FK (dim_date)", is_key=True, nullable=False),
         SparkColumn("store_sk", "long", "Store FK (dim_store)", is_key=True, nullable=False),

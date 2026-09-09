@@ -97,7 +97,7 @@ def build_fact_inventory_snapshot(
         "product_sk",
         F.round(F.col("list_price"), 2).alias("list_price"),
         F.round(F.col("standard_cost"), 2).alias("unit_cost"),
-        # popularity: high for low product_sk (mirrors the sales pow(u,3) tail)
+        # assortment breadth: low product_sk carried more widely (breadth heuristic, not sales-velocity — velocity is joined separately below)
         (F.lit(1.0) - (F.col("product_sk").cast("double") - F.lit(1.0)) / F.lit(num_products)).alias("_pop"),
     )
 

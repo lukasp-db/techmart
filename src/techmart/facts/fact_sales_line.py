@@ -126,9 +126,9 @@ def build_fact_sales_line(
     cat_size = lookup.groupBy("category_id").agg(F.count("*").alias("cat_size"))
 
     # --- category CDF over the categories actually present, using authored weights ---
-    weights = unit_weights_by_id()
+    cat_weights = unit_weights_by_id()
     present = [r["category_id"] for r in cat_size.select("category_id").orderBy("category_id").collect()]
-    ws = [(c, float(weights.get(c, 0.0))) for c in present if weights.get(c, 0.0) > 0]
+    ws = [(c, float(cat_weights.get(c, 0.0))) for c in present if cat_weights.get(c, 0.0) > 0]
     total_w = sum(w for _, w in ws)
     acc = 0.0
     cdf = []

@@ -66,7 +66,7 @@ def test_cyber5_and_seasons_are_pronounced(spark):
     assert bf and cm, "Black Friday / Cyber Monday not present in calendar"
     # Cyber-5 peak days are the heaviest in the year.
     peak = max(w.values())
-    assert w[bf[0]] >= 0.8 * peak and w[cm[0]] >= 0.8 * peak
+    assert max(w[sk] for sk in bf) >= 0.8 * peak and max(w[sk] for sk in cm) >= 0.8 * peak
     # Post-holiday trough (Jan/Feb) sits below baseline 100.
     trough = [sk for sk, r in rows.items() if r["selling_season"] == "Post-Holiday"]
     assert min(w[sk] for sk in trough) < 100

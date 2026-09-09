@@ -51,19 +51,20 @@ def test_scale_profiles_have_phase4_knobs():
     profiles = load_profiles(PROFILES)
     for name in ("smoke", "demo_lean", "showcase", "stress"):
         p = profiles[name]
-        assert p.inventory_snapshot_days >= 1
+        assert 0.0 < p.assortment_rate <= 1.0
+        assert p.target_wos_weeks >= 1
         assert p.inventory_movements_target >= 1
         assert p.web_events_target >= 1
     # smoke is intentionally tiny so the deploy proof is fast
     smoke = profiles["smoke"]
-    assert smoke.inventory_snapshot_days == 30
     assert smoke.inventory_movements_target == 20000
     assert smoke.web_events_target == 100000
 
 
 def test_scale_profile_defaults_keep_positional_construction():
     p = ScaleProfile("t", 5, 500, 1, 50000, 1000, 20)
-    assert p.inventory_snapshot_days == 7
+    assert p.assortment_rate == 0.30
+    assert p.target_wos_weeks == 8
     assert p.inventory_movements_target == 1000
     assert p.web_events_target == 1000
 

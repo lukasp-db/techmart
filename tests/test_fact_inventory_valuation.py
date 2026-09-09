@@ -23,8 +23,8 @@ _COUNTS = {"store": 6, "customer": 300, "employee": _P.num_employees,
 def _build(spark):
     dd = build_dim_date(spark, _CFG); dp = build_dim_product(spark, _CFG)
     ds = build_dim_store(spark, _CFG)
-    snap = build_fact_inventory_snapshot(spark, _CFG, dim_store=ds, dim_product=dp, dim_date=dd)
     sales = build_fact_sales_line(spark, _CFG, dim_product=dp, dim_date=dd, dim_counts=_COUNTS, rows=4000)
+    snap = build_fact_inventory_snapshot(spark, _CFG, dim_store=ds, dim_product=dp, dim_date=dd, fact_sales_line=sales)
     val = build_fact_inventory_valuation(spark, _CFG, fact_inventory_snapshot=snap,
                                          fact_sales_line=sales, dim_product=dp, dim_date=dd)
     return val, snap, dp, dd
@@ -65,3 +65,13 @@ def test_deterministic(spark):
     a = _build(spark)[0].agg(F.count("*").alias("n"), F.round(F.sum("on_hand_cost_value"), 2).alias("s")).first()
     b = _build(spark)[0].agg(F.count("*").alias("n"), F.round(F.sum("on_hand_cost_value"), 2).alias("s")).first()
     assert a == b
+
+
+def test_valuation_spans_all_fiscal_periods(spark):
+    val, snap, dp, dd = _build(spark)
+    from techmart.finance.periods import period_end_lookup
+    n_periods = period_end_lookup(dd).count()
+    # valuation now carries every fiscal period-end, not just the one that used
+    # to fall inside the old 7-day snapshot window.
+    assert val.select("date_sk").distinct().count() == n_periods
+    assert n_periods >= 10

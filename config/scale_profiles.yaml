@@ -7,9 +7,10 @@ profiles:
     sales_lines_target: 75000000
     num_customers: 500000
     num_vendors: 1000
-    inventory_snapshot_days: 14
     inventory_movements_target: 5000000
     web_events_target: 300000000
+    assortment_rate: 0.25
+    target_wos_weeks: 8
     num_reviews: 20000
     num_service_cases: 8000
     forecast_active_products: 2000
@@ -24,9 +25,10 @@ profiles:
     sales_lines_target: 750000000
     num_customers: 5000000
     num_vendors: 5000
-    inventory_snapshot_days: 7
     inventory_movements_target: 50000000
     web_events_target: 3000000000
+    assortment_rate: 0.20
+    target_wos_weeks: 8
     num_reviews: 100000
     num_service_cases: 40000
     forecast_active_products: 5000
@@ -41,9 +43,10 @@ profiles:
     sales_lines_target: 50000
     num_customers: 1000
     num_vendors: 20
-    inventory_snapshot_days: 30
     inventory_movements_target: 20000
     web_events_target: 100000
+    assortment_rate: 0.50
+    target_wos_weeks: 6
     num_reviews: 200
     num_service_cases: 100
     forecast_active_products: 100
@@ -58,9 +61,10 @@ profiles:
     sales_lines_target: 3000000000
     num_customers: 20000000
     num_vendors: 10000
-    inventory_snapshot_days: 7
     inventory_movements_target: 200000000
     web_events_target: 10000000000
+    assortment_rate: 0.15
+    target_wos_weeks: 8
     num_reviews: 200000
     num_service_cases: 100000
     forecast_active_products: 10000

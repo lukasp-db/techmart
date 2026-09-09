@@ -145,7 +145,7 @@ MV_SALES = MetricViewSpec(
 MV_INVENTORY = MetricViewSpec(
     name="mv_inventory",
     source_schema="core", source_table="fact_inventory_snapshot",
-    comment="Inventory stock-position metrics at store x SKU x day grain.",
+    comment="Inventory stock-position metrics at store x SKU x fiscal period-end grain.",
     joins=(_JOIN_DATE, _JOIN_PRODUCT, _JOIN_STORE),
     dimensions=(*_date_dims(), *_product_dims(), *_store_dims()),
     measures=(
@@ -163,7 +163,7 @@ MV_INVENTORY = MetricViewSpec(
                     "Average days of supply", "Avg Days of Supply", ("DOS",)),
         MetricField("out_of_stock_rate",
                     "AVG(CASE WHEN source.is_out_of_stock THEN 1 ELSE 0 END)",
-                    "Fraction of store x SKU x day cells out of stock", "Out-of-Stock Rate",
+                    "Fraction of store x SKU x fiscal period-end cells out of stock", "Out-of-Stock Rate",
                     ("OOS rate",), _PCT),
         MetricField("sku_count", "COUNT(DISTINCT source.product_sk)",
                     "Distinct SKU count", "SKU Count"),

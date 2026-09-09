@@ -12,6 +12,8 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 from ...config import TechmartConfig
+from ...facts.gen import uniform_hash
+from ...reference.pricing import price_bands_by_id
 from ...reference.taxonomy import subcategory_paths
 from ..framework import SparkColumn, SparkTableSpec
 from ..scd2 import scd2_columns, with_scd2_current
@@ -164,21 +166,6 @@ def build_dim_product(spark: SparkSession, config: TechmartConfig) -> DataFrame:
             expr="concat(dim_len, 'x', dim_wid, 'x', dim_hgt)",
             baseColumn=["dim_len", "dim_wid", "dim_hgt"],
         )
-        # --- pricing: msrp first, then list_price and standard_cost derived from it ---
-        .withColumn("msrp_raw", "double", minValue=9.99, maxValue=2999.99, random=True, omit=True)
-        .withColumn("msrp", "double", expr="round(msrp_raw, 2)", baseColumn="msrp_raw")
-        .withColumn("disc_pct", "double", minValue=0.0, maxValue=0.15, random=True, omit=True)
-        .withColumn(
-            "list_price", "double",
-            expr="round(msrp * (1.0 - disc_pct), 2)",
-            baseColumn=["msrp", "disc_pct"],
-        )
-        .withColumn("cost_pct", "double", minValue=0.5, maxValue=0.8, random=True, omit=True)
-        .withColumn(
-            "standard_cost", "double",
-            expr="round(msrp * cost_pct, 2)",
-            baseColumn=["msrp", "cost_pct"],
-        )
         # --- unit of measure ---
         .withColumn("uom", "string", values=_UOMS, random=True)
         # --- marketplace flags ---
@@ -248,6 +235,28 @@ def build_dim_product(spark: SparkSession, config: TechmartConfig) -> DataFrame:
                 "to_json(named_struct('color', color, 'weight_kg', weight_kg, 'brand', brand_name))"
             ),
         )
+    )
+
+    # --- category-band pricing: msrp log-uniform within the product's category band ---
+    bands = price_bands_by_id()
+    bands_df = F.broadcast(
+        spark.createDataFrame(
+            [(cid, float(lo), float(hi)) for cid, (lo, hi) in bands.items()],
+            "category_id string, price_low double, price_high double",
+        )
+    )
+    df = df.join(bands_df, on="category_id", how="left")
+    df = (
+        df
+        .withColumn("_u_msrp", uniform_hash(F.col("product_sk"), salt="msrp"))
+        .withColumn(
+            "msrp",
+            F.round(F.col("price_low") * F.pow(F.col("price_high") / F.col("price_low"), F.col("_u_msrp")), 2),
+        )
+        .withColumn("_disc", uniform_hash(F.col("product_sk"), salt="disc") * F.lit(0.15))
+        .withColumn("list_price", F.round(F.col("msrp") * (F.lit(1.0) - F.col("_disc")), 2))
+        .withColumn("_cost_pct", F.lit(0.5) + uniform_hash(F.col("product_sk"), salt="cost") * F.lit(0.3))
+        .withColumn("standard_cost", F.round(F.col("msrp") * F.col("_cost_pct"), 2))
     )
 
     df = with_scd2_current(df, config.start_date)

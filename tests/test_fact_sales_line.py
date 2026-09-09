@@ -78,3 +78,29 @@ def test_deterministic(spark):
         F.round(F.sum("net_sales_amount"), 2).alias("net"), F.sum("quantity").alias("q"),
         F.count(F.when(F.col("promotion_sk").isNull(), 1)).alias("np")).first()
     assert agg() == agg()
+
+
+def test_quantity_is_single_unit_skewed(spark):
+    df = _build(spark, rows=6000)
+    qmean = df.agg(F.avg("quantity")).first()[0]
+    assert 1.05 <= qmean <= 1.35, f"quantity mean {qmean:.2f} not single-unit-skewed"
+    assert df.filter(F.col("quantity") < 1).count() == 0
+
+
+def test_cheap_categories_outsell_expensive(spark):
+    # At a scale where every category has products, the top unit-weight category
+    # (Ethernet Cabling) must sell more lines than a big-ticket one (Gaming Laptops).
+    from techmart.config import ScaleProfile, TechmartConfig
+    from pathlib import Path
+    sp = ScaleProfile("t", 20, 480, 1, 20000, 400, 20)  # 480 skus over 24 cats => ~20 each
+    cfg = TechmartConfig(scale_profile=sp, seed=42, output_dir=Path("data"),
+                         catalog="c", schema_prefix="techmart_", end_date=date(2026, 1, 31))
+    counts = {"store": 20, "customer": 400, "employee": sp.num_employees,
+              "promotion": sp.num_promotions, "product": 480}
+    dp = build_dim_product(spark, cfg)
+    dd = build_dim_date(spark, cfg)
+    df = build_fact_sales_line(spark, cfg, dim_product=dp, dim_date=dd, dim_counts=counts, rows=20000)
+    j = df.join(dp.select("product_sk", "category_name"), "product_sk")
+    by_cat = {r["category_name"]: r["n"] for r in
+              j.groupBy("category_name").agg(F.count("*").alias("n")).collect()}
+    assert by_cat.get("Ethernet Cabling", 0) > by_cat.get("Gaming Laptops", 0)

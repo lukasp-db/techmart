@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import dbldatagen as dg
-from pyspark.sql import DataFrame, SparkSession, functions as F
+from pyspark.sql import DataFrame, SparkSession, Window, functions as F
 
 from ..config import TechmartConfig
 from ..spark.framework import SparkColumn, SparkTableSpec
 from .gen import uniform_hash
-from .lookups import date_seasonality_weights, product_economics
+from .lookups import date_seasonality_weights
+from ..reference.pricing import unit_weights_by_id
 
 FACT_SALES_LINE_SPEC = SparkTableSpec(
     schema="core",
@@ -110,24 +111,60 @@ def build_fact_sales_line(
     )
 
     # --- Deterministic per-line attributes via Spark hash (partition-independent) ---
-    num_products = dim_counts["product"]
     num_promotions = dim_counts["promotion"]
 
     def _u(salt: str) -> "Column":  # noqa: F821
         """Uniform pseudo-random double in [0, 1) keyed on (txn, line, salt)."""
         return uniform_hash(F.col("transaction_id"), F.col("line_number"), salt=salt)
 
+    # --- product lookup: within-category index + economics (broadcast) ---
+    win = Window.partitionBy("category_id").orderBy("product_sk")
+    lookup = (
+        dim_product.select("product_sk", "category_id", "list_price", "standard_cost")
+        .withColumn("cat_local_idx", (F.row_number().over(win) - F.lit(1)).cast("long"))
+    )
+    cat_size = lookup.groupBy("category_id").agg(F.count("*").alias("cat_size"))
+
+    # --- category CDF over the categories actually present, using authored weights ---
+    weights = unit_weights_by_id()
+    present = [r["category_id"] for r in cat_size.select("category_id").orderBy("category_id").collect()]
+    ws = [(c, float(weights.get(c, 0.0))) for c in present if weights.get(c, 0.0) > 0]
+    total_w = sum(w for _, w in ws)
+    acc = 0.0
+    cdf = []
+    for c, w in ws:
+        acc += w / total_w
+        cdf.append((c, acc))
+
+    # --- stage 1: pick category by weight (inverse-CDF when-chain on u1) ---
+    u1 = _u("cat")
+    cat_expr = F.lit(cdf[-1][0])
+    for c, upper in reversed(cdf[:-1]):
+        cat_expr = F.when(u1 < F.lit(upper), F.lit(c)).otherwise(cat_expr)
+    lines = lines.withColumn("category_id", cat_expr)
+
+    # --- stage 2: pick a product within the category (local index -> join) ---
+    lines = (
+        lines.join(F.broadcast(cat_size), "category_id")
+        .withColumn("cat_local_idx", F.floor(_u("prod") * F.col("cat_size")).cast("long"))
+        .drop("cat_size")
+    )
+    lines = lines.join(F.broadcast(lookup), ["category_id", "cat_local_idx"], "left")
+
+    # --- realistic quantity: single-unit skewed (avg ~1.16) ---
+    uq = _u("q")
+    lines = lines.withColumn(
+        "quantity",
+        F.when(uq < F.lit(0.88), F.lit(1))
+        .when(uq < F.lit(0.97), F.lit(2))
+        .when(uq < F.lit(0.99), F.lit(3))
+        .otherwise(F.lit(4))
+        .cast("int"),
+    )
+
+    # --- promotion + tender (unchanged logic) ---
     lines = (
         lines
-        # Long-tail product distribution — pow(u,3) biases toward lower skus.
-        .withColumn(
-            "product_sk",
-            (F.floor(F.pow(_u("p"), 3.0) * F.lit(num_products)) + 1).cast("long"),
-        )
-        .withColumn(
-            "quantity",
-            (F.pmod(F.hash(F.col("transaction_id"), F.col("line_number"), F.lit("q")), 5) + 1).cast("int"),
-        )
         .withColumn(
             "promotion_sk",
             F.when(
@@ -153,17 +190,9 @@ def build_fact_sales_line(
         )
     )
 
-    # --- Join product economics (list_price / standard_cost) ---
-    econ = product_economics(dim_product).select(
-        F.col("product_sk").alias("_econ_sk"),
-        F.col("list_price"),
-        F.col("standard_cost"),
-    )
-    joined = lines.join(econ, lines["product_sk"] == econ["_econ_sk"], "left").drop("_econ_sk")
-
     # --- Derive measure chain ---
     df = (
-        joined
+        lines
         .withColumn("unit_price", F.round(F.col("list_price"), 2))
         .withColumn("unit_cost", F.round(F.col("standard_cost"), 2))
         .withColumn("receipt_id", F.concat(F.lit("RCPT-"), F.col("transaction_id").cast("string")))

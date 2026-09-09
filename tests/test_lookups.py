@@ -48,9 +48,25 @@ def test_date_weights_cover_calendar_and_are_positive(spark):
     dim = build_dim_date(spark, _CONFIG)
     date_sks, weights = date_seasonality_weights(dim)
     total_days = dim.count()
-    assert len(date_sks) == total_days
-    assert len(weights) == total_days
+    assert len(date_sks) == total_days == len(weights)
     assert min(weights) >= 1
     assert date_sks == sorted(date_sks)
-    # Holiday-season days should on average outweigh a flat baseline of 100.
     assert max(weights) > 100
+
+
+def test_cyber5_and_seasons_are_pronounced(spark):
+    from pyspark.sql import functions as F
+    dim = build_dim_date(spark, _CONFIG)
+    date_sks, weights = date_seasonality_weights(dim)
+    w = dict(zip(date_sks, weights))
+    rows = {r["date_sk"]: r for r in dim.select(
+        "date_sk", "holiday_name", "selling_season", "month").collect()}
+    bf = [sk for sk, r in rows.items() if r["holiday_name"] == "Black Friday"]
+    cm = [sk for sk, r in rows.items() if r["holiday_name"] == "Cyber Monday"]
+    assert bf and cm, "Black Friday / Cyber Monday not present in calendar"
+    # Cyber-5 peak days are the heaviest in the year.
+    peak = max(w.values())
+    assert w[bf[0]] >= 0.8 * peak and w[cm[0]] >= 0.8 * peak
+    # Post-holiday trough (Jan/Feb) sits below baseline 100.
+    trough = [sk for sk, r in rows.items() if r["selling_season"] == "Post-Holiday"]
+    assert min(w[sk] for sk in trough) < 100

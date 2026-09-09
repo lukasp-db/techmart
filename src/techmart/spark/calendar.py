@@ -77,6 +77,8 @@ def holiday_name(d: date) -> str | None:
         return "Thanksgiving"
     if d == thanksgiving + timedelta(days=1):
         return "Black Friday"
+    if d == thanksgiving + timedelta(days=4):
+        return "Cyber Monday"
     if d == _last_weekday(d.year, 5, 0):  # last Monday of May
         return "Memorial Day"
     if d == _nth_weekday(d.year, 9, 0, 1):  # first Monday of September

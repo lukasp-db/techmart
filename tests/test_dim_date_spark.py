@@ -26,3 +26,11 @@ def test_dim_date_known_values(spark):
     row = df.filter(F.col("date_sk") == 20251225).first()
     assert row["is_holiday"] is True and row["holiday_name"] == "Christmas Day"
     assert row["month_name"] == "December"
+
+
+def test_cyber_monday_recognized(spark):
+    df = build_dim_date(spark, _CFG)
+    from pyspark.sql import functions as F
+    # 2025 Thanksgiving = Nov 27; Cyber Monday = Dec 1, 2025 -> date_sk 20251201
+    row = df.filter(F.col("date_sk") == 20251201).first()
+    assert row is not None and row["holiday_name"] == "Cyber Monday"

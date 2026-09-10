@@ -3,24 +3,26 @@ name = "techmart-forecast-adjustments"
 version = "0.1.0"
 description = "TechMart Demand Forecast Adjustments — Databricks App (read-only over Unity Catalog via databricks-sql-connector)"
 requires-python = ">=3.11"
-# No runtime dependencies: the app uses only the Python standard library
-# (http.server + urllib) so the Apps build installs zero packages — the build's
-# pypi proxy is unreliable, so anything to download is a deployment risk.
-dependencies = []
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "databricks-sql-connector>=4.0.0",
+    "databricks-sdk>=0.30.0",
+    "pydantic>=2.0.0",
+]
 
 # Local/dev-only deps (opt-in group; the Apps runtime's `uv sync` skips it since it is
-# not the default `dev` group). databricks-sdk is used only for LOCAL auth (reading the
-# CLI profile token); the deployed app authenticates via injected SP creds + urllib.
+# not the default `dev` group).
 # Locally: `uv run --group test pytest backend/tests`
-#          `uv run --group test python -m backend.server`
+#          `uv run python -m backend.main`  (or: uv run uvicorn backend.main:app)
 [dependency-groups]
 test = [
     "pytest>=8.0.0",
-    "databricks-sdk>=0.30.0",
 ]
 
 [tool.uv]
 package = false
-# The Apps builder's pypi proxy intermittently drops parallel connections;
-# serialize downloads to keep the install reliable.
-concurrent-downloads = 2
+# The Apps builder's pypi proxy intermittently drops parallel connections
+# (transient "client error (Connect)" on random small wheels); serialize
+# downloads to keep the install reliable.
+concurrent-downloads = 1

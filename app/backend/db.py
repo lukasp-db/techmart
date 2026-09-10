@@ -12,9 +12,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import requests
-
-from . import config
+from . import config, httpjson
 
 _INT_TYPES = {"INT", "INTEGER", "SHORT", "BYTE", "LONG", "BIGINT", "SMALLINT", "TINYINT"}
 _FLOAT_TYPES = {"FLOAT", "DOUBLE", "DECIMAL"}
@@ -72,10 +70,9 @@ def _rows_from(payload: dict) -> list[dict]:
 def run_query(query: str, params: dict[str, Any] | None = None) -> list[dict]:
     """Execute a parameterized SELECT and return a list of typed dict rows."""
     base = config.get_host()
-    resp = requests.post(
+    payload = httpjson.post_json(
         f"{base}/api/2.0/sql/statements",
-        headers=_headers(),
-        json={
+        body={
             "warehouse_id": config.WAREHOUSE_ID,
             "statement": query,
             "parameters": _to_params(params),
@@ -83,10 +80,9 @@ def run_query(query: str, params: dict[str, Any] | None = None) -> list[dict]:
             "disposition": "INLINE",
             "format": "JSON_ARRAY",
         },
+        headers=_headers(),
         timeout=90,
     )
-    resp.raise_for_status()
-    payload = resp.json()
 
     # On-demand execution usually returns SUCCEEDED inline; poll if still running.
     statement_id = payload.get("statement_id")
@@ -94,11 +90,9 @@ def run_query(query: str, params: dict[str, Any] | None = None) -> list[dict]:
     deadline = time.time() + 60
     while state in ("PENDING", "RUNNING") and statement_id and time.time() < deadline:
         time.sleep(1.0)
-        r = requests.get(
+        payload = httpjson.get_json(
             f"{base}/api/2.0/sql/statements/{statement_id}", headers=_headers(), timeout=30
         )
-        r.raise_for_status()
-        payload = r.json()
         state = (payload.get("status") or {}).get("state")
 
     if state != "SUCCEEDED":

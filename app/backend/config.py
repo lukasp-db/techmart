@@ -17,7 +17,7 @@ import os
 import threading
 import time
 
-import requests
+from . import httpjson
 
 # --- Table / catalog names (env-overridable, sensible defaults) ---
 CATALOG = os.environ.get("TECHMART_CATALOG", "stable_classic_ppke9o")
@@ -71,17 +71,15 @@ def _client_credentials_token() -> tuple[str, float]:
     client_id = os.environ["DATABRICKS_CLIENT_ID"]
     client_secret = os.environ["DATABRICKS_CLIENT_SECRET"]
     basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    resp = requests.post(
+    payload = httpjson.post_form(
         f"{get_host()}/oidc/v1/token",
+        form={"grant_type": "client_credentials", "scope": "all-apis"},
         headers={
             "Authorization": f"Basic {basic}",
             "Content-Type": "application/x-www-form-urlencoded",
         },
-        data={"grant_type": "client_credentials", "scope": "all-apis"},
         timeout=30,
     )
-    resp.raise_for_status()
-    payload = resp.json()
     return payload["access_token"], time.time() + float(payload.get("expires_in", 3600))
 
 

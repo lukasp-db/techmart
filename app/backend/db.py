@@ -1,17 +1,18 @@
-"""SQL access over the warehouse via the Databricks SDK Statement Execution API.
+"""SQL access over the warehouse via the SQL Statement Execution REST API (requests).
 
-We use the SDK (already required for auth) rather than databricks-sql-connector so
-the app has no pandas/numpy footprint — the connector pulls those in and their large
-wheels are unreliable to install in the Apps build environment. Same result: read-only
-parameterized SQL executed on the SQL warehouse.
+We call the REST API directly with `requests` rather than databricks-sql-connector or
+the SDK so the deployed app carries no pandas/numpy/cryptography footprint — those
+large/native wheels are unreliable to install in the Apps build sandbox. Same result:
+read-only parameterized SQL executed on the SQL warehouse.
 
 All user input is bound as named (:name) statement parameters — never interpolated.
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
-from databricks.sdk.service.sql import StatementParameterListItem, StatementState
+import requests
 
 from . import config
 
@@ -35,40 +36,72 @@ def _coerce(value: str | None, type_name: str | None) -> Any:
     return value
 
 
-def _to_params(params: dict[str, Any] | None) -> list[StatementParameterListItem]:
-    items: list[StatementParameterListItem] = []
+def _to_params(params: dict[str, Any] | None) -> list[dict]:
+    items: list[dict] = []
     for name, v in (params or {}).items():
         if isinstance(v, bool):
-            items.append(StatementParameterListItem(name=name, value=str(v).lower(), type="BOOLEAN"))
+            items.append({"name": name, "value": str(v).lower(), "type": "BOOLEAN"})
         elif isinstance(v, int):
-            items.append(StatementParameterListItem(name=name, value=str(v), type="INT"))
+            items.append({"name": name, "value": str(v), "type": "INT"})
         elif isinstance(v, float):
-            items.append(StatementParameterListItem(name=name, value=str(v), type="DOUBLE"))
+            items.append({"name": name, "value": str(v), "type": "DOUBLE"})
         elif v is None:
-            items.append(StatementParameterListItem(name=name, value=None))
+            items.append({"name": name, "value": None})
         else:
-            items.append(StatementParameterListItem(name=name, value=str(v)))
+            items.append({"name": name, "value": str(v)})
     return items
 
 
-def run_query(query: str, params: dict[str, Any] | None = None) -> list[dict]:
-    """Execute a parameterized SELECT and return a list of typed dict rows."""
-    w = config.get_workspace_client()
-    resp = w.statement_execution.execute_statement(
-        warehouse_id=config.WAREHOUSE_ID,
-        statement=query,
-        parameters=_to_params(params),
-        wait_timeout="50s",
-    )
-    if resp.status and resp.status.state != StatementState.SUCCEEDED:
-        detail = resp.status.error.message if resp.status.error else resp.status.state
-        raise RuntimeError(f"Statement failed: {detail}")
+def _headers() -> dict:
+    return {"Authorization": f"Bearer {config.get_access_token()}"}
 
-    cols = resp.manifest.schema.columns if (resp.manifest and resp.manifest.schema) else []
-    names = [c.name for c in cols]
-    types = [c.type_name.value if c.type_name else None for c in cols]
-    data = (resp.result.data_array if resp.result else None) or []
+
+def _rows_from(payload: dict) -> list[dict]:
+    manifest = payload.get("manifest") or {}
+    schema = manifest.get("schema") or {}
+    cols = schema.get("columns") or []
+    names = [c["name"] for c in cols]
+    types = [c.get("type_name") for c in cols]
+    data = ((payload.get("result") or {}).get("data_array")) or []
     return [
         {names[i]: _coerce(cell, types[i]) for i, cell in enumerate(row)}
         for row in data
     ]
+
+
+def run_query(query: str, params: dict[str, Any] | None = None) -> list[dict]:
+    """Execute a parameterized SELECT and return a list of typed dict rows."""
+    base = config.get_host()
+    resp = requests.post(
+        f"{base}/api/2.0/sql/statements",
+        headers=_headers(),
+        json={
+            "warehouse_id": config.WAREHOUSE_ID,
+            "statement": query,
+            "parameters": _to_params(params),
+            "wait_timeout": "50s",
+            "disposition": "INLINE",
+            "format": "JSON_ARRAY",
+        },
+        timeout=90,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+
+    # On-demand execution usually returns SUCCEEDED inline; poll if still running.
+    statement_id = payload.get("statement_id")
+    state = (payload.get("status") or {}).get("state")
+    deadline = time.time() + 60
+    while state in ("PENDING", "RUNNING") and statement_id and time.time() < deadline:
+        time.sleep(1.0)
+        r = requests.get(
+            f"{base}/api/2.0/sql/statements/{statement_id}", headers=_headers(), timeout=30
+        )
+        r.raise_for_status()
+        payload = r.json()
+        state = (payload.get("status") or {}).get("state")
+
+    if state != "SUCCEEDED":
+        err = (payload.get("status") or {}).get("error") or {}
+        raise RuntimeError(f"Statement {state}: {err.get('message', '')}")
+    return _rows_from(payload)

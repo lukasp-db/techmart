@@ -1,0 +1,23 @@
+command:
+  - "python"
+  - "-m"
+  - "uvicorn"
+  - "backend.main:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "8000"
+
+env:
+  - name: "DATABRICKS_WAREHOUSE_ID"
+    value: "ec3c986a891e0b79"
+  - name: "TECHMART_CATALOG"
+    value: "stable_classic_ppke9o"
+  - name: "TECHMART_AI_SCHEMA"
+    value: "techmart_ai"
+  - name: "TECHMART_CORE_SCHEMA"
+    value: "techmart_core"
+  - name: "TECHMART_LAKEBASE_CATALOG"
+    value: "techmart_lakebase"
+  - name: "TECHMART_OPS_SCHEMA"
+    value: "techmart_ops"

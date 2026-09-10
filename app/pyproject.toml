@@ -1,0 +1,33 @@
+[project]
+name = "techmart-forecast-adjustments"
+version = "0.1.0"
+description = "TechMart Demand Forecast Adjustments — Databricks App (FastAPI; read-only UC via the SQL Statement Execution REST API over stdlib urllib)"
+requires-python = ">=3.11"
+# Runtime deps are deliberately minimal: only fastapi + uvicorn (uvicorn base, no
+# [standard] extras). The Apps build pip proxy connect-fails on large compiled wheels
+# — numpy (via databricks-sql-connector->pandas) and cryptography (via
+# databricks-sdk->google-auth) both fail to download. So auth + SQL go through stdlib
+# urllib against the REST APIs (backend/httpjson.py, config.py, db.py); no SDK, no
+# connector at runtime. The only compiled runtime wheel is fastapi's pydantic-core.
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+]
+
+# Local/dev-only deps (opt-in group; the Apps runtime's `uv sync` skips it since it is
+# not the default group). databricks-sdk is used ONLY for the local token fallback in
+# config.py (lazy import); it never installs in the deployed app.
+# Locally: `uv run --group test pytest backend/tests`
+#          `uv run --group test uvicorn backend.main:app`
+[dependency-groups]
+test = [
+    "pytest>=8.0.0",
+    "databricks-sdk>=0.30.0",
+]
+
+[tool.uv]
+package = false
+# The Apps builder's pypi proxy intermittently drops parallel connections
+# (transient "client error (Connect)" on random small wheels); serialize
+# downloads to keep the install reliable.
+concurrent-downloads = 1

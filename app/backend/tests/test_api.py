@@ -1,22 +1,23 @@
-"""Backend unit tests — no live warehouse (queries.run_query is monkeypatched)."""
+"""Backend unit tests — no live warehouse (queries.run_query is monkeypatched).
+
+Tests call the framework-agnostic API functions in backend.api directly.
+"""
 from __future__ import annotations
 
 import pytest
-from starlette.testclient import TestClient
 
-from backend import main, queries
+from backend import api, queries
 
 
 @pytest.fixture(autouse=True)
 def _reset_session():
-    main._SESSION_OVERRIDES.clear()
+    api._SESSION_OVERRIDES.clear()
     yield
-    main._SESSION_OVERRIDES.clear()
+    api._SESSION_OVERRIDES.clear()
 
 
-@pytest.fixture
-def client(monkeypatch):
-    # Stub the SQL boundary so no warehouse is contacted.
+@pytest.fixture(autouse=True)
+def _stub_sql(monkeypatch):
     def fake_run_query(query, params=None):
         q = query.lower()
         if "left join" in q and "override" in q:  # fetch_overrides
@@ -34,31 +35,29 @@ def client(monkeypatch):
         return []
 
     monkeypatch.setattr(queries, "run_query", fake_run_query)
-    return TestClient(main.app)
 
 
-def test_filters(client):
-    r = client.get("/api/filters")
-    assert r.status_code == 200
-    body = r.json()
+def test_filters():
+    status, body = api.filters(None)
+    assert status == 200
     assert body["categories"] == ["Smartphones", "Tablets"]
     assert body["week_min"] == {"fiscal_year": 2025, "fiscal_week": 1}
     assert body["reasons"] and body["planners"]
 
 
-def test_post_valid_prepends_and_unions(client):
+def test_post_valid_prepends_and_unions():
     payload = {
         "product_sk": 1, "store_sk": 10, "fiscal_year": 2025, "fiscal_week": 5,
         "ai_forecast_qty": 12.0, "override_qty": 15.0,
         "override_reason": "Local promotion", "planner_id": "planner_amir",
     }
-    r = client.post("/api/adjustments", json=payload)
-    assert r.status_code == 200
-    row = r.json()["row"]
+    status, resp = api.post_adjustment(payload)
+    assert status == 200
+    row = resp["row"]
     assert row["source"] == "session" and row["override_id"].startswith("session-")
     assert row["product_name"] == "Phone A"
 
-    g = client.get("/api/adjustments").json()
+    _, g = api.get_adjustments(None)
     assert g["session_count"] == 1
     assert g["rows"][0]["override_id"] == row["override_id"]  # newest-first
 
@@ -68,14 +67,15 @@ def test_post_valid_prepends_and_unions(client):
     ("planner_id", "planner_zzz"),
     ("override_qty", -3.0),
 ])
-def test_post_rejects_invalid(client, field, value):
+def test_post_rejects_invalid(field, value):
     payload = {
         "product_sk": 1, "store_sk": 10, "fiscal_year": 2025, "fiscal_week": 5,
         "ai_forecast_qty": 12.0, "override_qty": 15.0,
         "override_reason": "Local promotion", "planner_id": "planner_amir",
     }
     payload[field] = value
-    assert client.post("/api/adjustments", json=payload).status_code == 422
+    status, _ = api.post_adjustment(payload)
+    assert status == 422
 
 
 def test_forecast_query_is_parameterized(monkeypatch):
@@ -85,7 +85,7 @@ def test_forecast_query_is_parameterized(monkeypatch):
     def spy(query, params=None):
         captured["query"], captured["params"] = query, params
         return [
-            {"fiscal_year": 2025, "fiscal_week": 1, "week_end_date": None,
+            {"fiscal_year": 2025, "fiscal_week": 1, "week_end_date": "2025-02-08",
              "version": "improved", "forecast_qty": 10.0, "forecast_amount": 100.0,
              "lower_bound": 8.0, "upper_bound": 12.0},
         ]
@@ -98,7 +98,6 @@ def test_forecast_query_is_parameterized(monkeypatch):
     assert "Smartphones" not in captured["query"]  # value not interpolated
     assert rows[0]["forecast_qty"] == 10.0
 
-    # product level binds an int id and both-version omits ver
     queries.fetch_forecast("product", "42", 2025, 1, 2025, 4, "both")
     assert captured["params"]["id"] == 42
     assert "ver" not in captured["params"]

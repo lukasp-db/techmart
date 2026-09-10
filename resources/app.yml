@@ -1,0 +1,15 @@
+# Databricks App: TechMart — Demand Forecast Adjustments.
+# React (Vite) + FastAPI, read-only over Unity Catalog via databricks-sql-connector.
+# Attaches the serverless SQL warehouse as an app resource (CAN_USE); the app reads
+# the warehouse id from the DATABRICKS_WAREHOUSE_ID env in app/app.yaml.
+resources:
+  apps:
+    forecast_adjustments:
+      name: techmart-forecast-adjustments
+      description: "TechMart demand planners review the weekly forecast and submit (mock) adjustments."
+      source_code_path: ../app
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ec3c986a891e0b79
+            permission: CAN_USE

@@ -130,8 +130,7 @@ def fetch_forecast(
         params,
     )
     for r in rows:
-        wed = r.get("week_end_date")
-        r["week_end_date"] = wed.isoformat() if wed is not None else None
+        # week_end_date arrives as an ISO date string (e.g. "2025-02-08").
         for k in ("forecast_qty", "forecast_amount", "lower_bound", "upper_bound"):
             r[k] = float(r[k]) if r[k] is not None else None
     return rows
@@ -171,7 +170,6 @@ def fetch_overrides(limit: int = 100) -> list[dict]:
 
     out = []
     for r in rows:
-        created = r.get("created_at")
         out.append(
             {
                 "override_id": str(r["override_id"]),
@@ -189,7 +187,7 @@ def fetch_overrides(limit: int = 100) -> list[dict]:
                 else None,
                 "override_reason": r["override_reason"],
                 "planner_id": r["planner_id"],
-                "created_at": created.isoformat() if created is not None else None,
+                "created_at": r.get("created_at"),
                 "source": "lakebase",
             }
         )

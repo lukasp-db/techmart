@@ -5,17 +5,21 @@ description = "TechMart Demand Forecast Adjustments — Databricks App (read-onl
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "databricks-sql-connector>=3.7.0",
+    "uvicorn>=0.30.0",
     "databricks-sdk>=0.30.0",
     "pydantic>=2.0.0",
 ]
 
+# Test-only deps (opt-in group; the Apps runtime's `uv sync` skips it since it
+# is not the default `dev` group). Locally: `uv run --group test pytest backend/tests`
 [dependency-groups]
-dev = [
+test = [
     "pytest>=8.0.0",
     "httpx>=0.27.0",
 ]
 
 [tool.uv]
 package = false
+# The Apps builder's pypi proxy intermittently drops parallel connections;
+# serialize downloads to keep the install reliable.
+concurrent-downloads = 2

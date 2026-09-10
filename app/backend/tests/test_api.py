@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
+from starlette.testclient import TestClient
 
 from backend import main, queries
 

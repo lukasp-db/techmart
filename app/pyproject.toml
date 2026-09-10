@@ -4,10 +4,9 @@ version = "0.1.0"
 description = "TechMart Demand Forecast Adjustments — Databricks App (read-only over Unity Catalog via databricks-sql-connector)"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.115.0",
+    "starlette>=0.37.0",
     "uvicorn>=0.30.0",
     "databricks-sdk>=0.30.0",
-    "pydantic>=2.0.0",
 ]
 
 # Test-only deps (opt-in group; the Apps runtime's `uv sync` skips it since it

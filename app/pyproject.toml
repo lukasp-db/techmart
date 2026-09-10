@@ -1,16 +1,16 @@
 [project]
 name = "techmart-forecast-adjustments"
 version = "0.1.0"
-description = "TechMart Demand Forecast Adjustments — Databricks App (Starlette; read-only UC via the SQL Statement Execution REST API over stdlib urllib)"
+description = "TechMart Demand Forecast Adjustments — Databricks App (FastAPI; read-only UC via the SQL Statement Execution REST API over stdlib urllib)"
 requires-python = ">=3.11"
-# Runtime deps are STARLETTE + uvicorn only — both pure-Python (py3-none-any). The
-# Apps build pip proxy connect-fails on every compiled manylinux x86_64 wheel we hit:
-# numpy (databricks-sql-connector->pandas), cryptography (databricks-sdk->google-auth),
-# and pydantic-core (fastapi->pydantic) — so FastAPI is NOT deployable here. Starlette
-# is a real ASGI framework with no pydantic-core, so it installs cleanly. Auth + SQL
-# go through stdlib urllib against the REST APIs (backend/httpjson.py, config.py, db.py).
+# Runtime deps are deliberately minimal: only fastapi + uvicorn (uvicorn base, no
+# [standard] extras). The Apps build pip proxy connect-fails on large compiled wheels
+# — numpy (via databricks-sql-connector->pandas) and cryptography (via
+# databricks-sdk->google-auth) both fail to download. So auth + SQL go through stdlib
+# urllib against the REST APIs (backend/httpjson.py, config.py, db.py); no SDK, no
+# connector at runtime. The only compiled runtime wheel is fastapi's pydantic-core.
 dependencies = [
-    "starlette>=0.37.0",
+    "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
 ]
 

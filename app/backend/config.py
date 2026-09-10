@@ -1,22 +1,23 @@
 """Environment + dual-mode auth configuration.
 
-Auth uses the Databricks SDK (a runtime dependency) in both modes:
+Auth is done with the standard library + `requests` so the deployed app needs no
+databricks-sdk (its google-auth/cryptography wheels are unreliable to install in the
+Apps build sandbox):
 
 - In the app: the runtime injects DATABRICKS_CLIENT_ID / DATABRICKS_CLIENT_SECRET /
-  DATABRICKS_HOST; the default SDK auth chain picks these up (SP OAuth M2M) and
-  `w.config.authenticate()` mints a short-lived workspace bearer token.
-- Local dev: no injected SP creds, so the SDK reads the CLI profile
-  (DATABRICKS_PROFILE, default `field-eng-east`).
-
-The resulting bearer token is passed to databricks-sql-connector as `access_token`.
+  DATABRICKS_HOST. We run the OAuth client-credentials flow against the workspace
+  OIDC token endpoint to get a short-lived all-apis token, cached until near expiry.
+- Local dev: no client secret is present, so we lazily import the Databricks SDK and
+  read the token from the CLI profile (SDK is a dev-only dependency).
 """
 from __future__ import annotations
 
+import base64
 import os
 import threading
-from urllib.parse import urlparse
+import time
 
-from databricks.sdk import WorkspaceClient
+from . import httpjson
 
 # --- Table / catalog names (env-overridable, sensible defaults) ---
 CATALOG = os.environ.get("TECHMART_CATALOG", "stable_classic_ppke9o")
@@ -44,7 +45,7 @@ REASONS = [
 PLANNERS = ["planner_amir", "planner_bianca", "planner_chen", "planner_dana"]
 
 _lock = threading.Lock()
-_client: WorkspaceClient | None = None
+_token_cache: dict[str, float | str] = {"token": "", "expires_at": 0.0}
 
 
 def _normalize_host(host: str) -> str:
@@ -54,38 +55,53 @@ def _normalize_host(host: str) -> str:
     return host.rstrip("/")
 
 
-def _workspace_client() -> WorkspaceClient:
-    """Cached WorkspaceClient — SP OAuth in the app, CLI profile locally."""
-    global _client
-    with _lock:
-        if _client is None:
-            if IS_DATABRICKS_APP:
-                _client = WorkspaceClient()  # injected SP creds
-            else:
-                profile = os.environ.get("DATABRICKS_PROFILE", "field-eng-east")
-                _client = WorkspaceClient(profile=profile)
-        return _client
-
-
 def get_host() -> str:
     """Workspace base URL, with scheme (e.g. https://adb-....azuredatabricks.net)."""
     env_host = os.environ.get("DATABRICKS_HOST")
     if env_host:
         return _normalize_host(env_host)
-    return _normalize_host(_workspace_client().config.host)
+    # Local dev: read from the SDK/CLI profile.
+    from databricks.sdk import WorkspaceClient  # lazy: dev-only dependency
+
+    profile = os.environ.get("DATABRICKS_PROFILE", "field-eng-east")
+    return _normalize_host(WorkspaceClient(profile=profile).config.host)
 
 
-def get_server_hostname() -> str:
-    """Bare hostname (no scheme) for the SQL connector."""
-    return urlparse(get_host()).netloc
+def _client_credentials_token() -> tuple[str, float]:
+    client_id = os.environ["DATABRICKS_CLIENT_ID"]
+    client_secret = os.environ["DATABRICKS_CLIENT_SECRET"]
+    basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    payload = httpjson.post_form(
+        f"{get_host()}/oidc/v1/token",
+        form={"grant_type": "client_credentials", "scope": "all-apis"},
+        headers={
+            "Authorization": f"Basic {basic}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        timeout=30,
+    )
+    return payload["access_token"], time.time() + float(payload.get("expires_in", 3600))
 
 
-def get_http_path() -> str:
-    """SQL warehouse HTTP path for the connector."""
-    return f"/sql/1.0/warehouses/{WAREHOUSE_ID}"
+def _sdk_token() -> tuple[str, float]:
+    from databricks.sdk import WorkspaceClient  # lazy: dev-only dependency
+
+    profile = os.environ.get("DATABRICKS_PROFILE", "field-eng-east")
+    w = WorkspaceClient(profile=profile)
+    headers = w.config.authenticate()
+    token = headers["Authorization"].replace("Bearer ", "")
+    return token, time.time() + 600  # refresh conservatively
 
 
 def get_access_token() -> str:
-    """Bearer token for the SQL connector; the SDK caches/refreshes it internally."""
-    headers = _workspace_client().config.authenticate()
-    return headers["Authorization"].replace("Bearer ", "")
+    """Bearer token for the REST API; cached and refreshed before expiry."""
+    with _lock:
+        if _token_cache["token"] and time.time() < float(_token_cache["expires_at"]) - 60:
+            return str(_token_cache["token"])
+        if os.environ.get("DATABRICKS_CLIENT_ID") and os.environ.get("DATABRICKS_CLIENT_SECRET"):
+            token, expires_at = _client_credentials_token()
+        else:
+            token, expires_at = _sdk_token()
+        _token_cache["token"] = token
+        _token_cache["expires_at"] = expires_at
+        return token

@@ -28,8 +28,9 @@ story), built on the live showcase data.
   category/product pickers and labels.
 - **Dates:** `stable_classic_ppke9o.techmart_core.dim_date` for week-end dates /
   labels if needed (forecast rows already carry fiscal_year/week + date_sk).
-- **Adjustments (existing):** `techmart_lakebase.ops.forecast_override` — the
-  Lakebase-federated UC catalog, read-only. Columns: `override_id`, `product_sk`,
+- **Adjustments (existing):** `techmart_lakebase.techmart_ops.forecast_override`
+  — the Lakebase-federated UC catalog (schema is `techmart_ops`, = schema_prefix
+  + "ops"; verified live with 20,000 rows), read-only. Columns: `override_id`, `product_sk`,
   `store_sk`, `fiscal_year`, `fiscal_week`, `ai_forecast_qty`, `override_qty`,
   `override_reason`, `planner_id`, `created_at`, `updated_at`. Reason vocabulary:
   Local promotion / Competitor closeout / Weather event / Known stockout recovery.
@@ -84,9 +85,9 @@ resources/app.yml          # DAB `apps` resource pointing at ../app
   forecast_amount, lower_bound, upper_bound}], summary: {total_qty, total_amount,
   avg_weekly_qty} }`. Aggregated **across stores** to the chosen grain
   (SUM(qty/amount), and bounds summed) per week per version, over the timeframe.
-- `GET /api/adjustments?limit=` → existing `forecast_override` rows (joined to
-  `dim_product` for category/product labels) newest-first, **plus** any in-memory
-  session rows, unioned and returned newest-first.
+- `GET /api/adjustments?limit=` → existing `techmart_ops.forecast_override` rows
+  (joined to `dim_product` for category/product labels) newest-first, **plus** any
+  in-memory session rows, unioned and returned newest-first.
 - `POST /api/adjustments` → body `{product_sk, store_sk, fiscal_year, fiscal_week,
   ai_forecast_qty, override_qty, override_reason, planner_id}`. **Mock:**
   validate against the reason/planner vocabularies and ranges, synthesize

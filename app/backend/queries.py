@@ -142,6 +142,9 @@ def fetch_overrides(limit: int = 100) -> list[dict]:
 
     Returns [] on any error so the app still works if the federated table is down.
     """
+    # LIMIT cannot take a BIGINT-typed statement parameter in Databricks SQL, so the
+    # (server-controlled, int-coerced) limit is inlined — never user free-text.
+    lim = int(limit)
     try:
         rows = run_query(
             f"""
@@ -160,9 +163,8 @@ def fetch_overrides(limit: int = 100) -> list[dict]:
             FROM {OVERRIDE} o
             LEFT JOIN {PRODUCT} p ON o.product_sk = p.product_sk
             ORDER BY o.created_at DESC
-            LIMIT :lim
+            LIMIT {lim}
             """,
-            {"lim": int(limit)},
         )
     except Exception as exc:  # pragma: no cover - defensive fallback
         print(f"[warn] fetch_overrides failed, returning empty list: {exc}")
